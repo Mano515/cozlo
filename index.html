@@ -631,13 +631,17 @@
       if (isNoise(texts)) continue;
       if (isRefCode(texts)) continue;
 
-      const m0 = texts[0].match(DD_MM);
+      // Scan first 4 items for a DD.MM date — margin codes like "260512" can precede it
+      const firstDateIdx = texts.findIndex((t, i) => i < 4 && DD_MM.test(t));
+      const m0 = firstDateIdx >= 0 ? texts[firstDateIdx].match(DD_MM) : null;
+
       if (m0) {
         if (current) transactions.push(current);
 
-        let descStart = 1;
-        if (texts[1] && texts[1].match(DD_MM)) descStart = 2;
+        let descStart = firstDateIdx + 1;
+        if (texts[firstDateIdx + 1]?.match(DD_MM)) descStart = firstDateIdx + 2;
 
+        // Work on a copy of the row items starting from descStart
         const rowCopy = [...row];
         let debit = '', credit = '';
         for (let i = rowCopy.length - 1; i >= descStart; i--) {
