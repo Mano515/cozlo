@@ -479,8 +479,225 @@
   // ── Parsers ───────────────────────────────────────────────────────────────────
 
   function detectAndParse(items) {
+    const t = items.map(i => i.text).join(' ');
+    if (/cr[eé]dit\s+agricole/i.test(t))       return parseCreditAgricole(items);
+    if (/bnp\s*paribas/i.test(t))               return parseBNP(items);
+    if (/soci[eé]t[eé]\s+g[eé]n[eé]rale/i.test(t)) return parseSG(items);
+    if (/caisse\s+d.{0,2}[eé]pargne/i.test(t)) return parseCEP(items);
+    if (/banque\s+postale/i.test(t))            return parseLBP(items);
+    if (/cr[eé]dit\s+mutuel/i.test(t))          return parseCM(items);
+    if (/lcl/i.test(t) && /lyonnais/i.test(t)) return parseLCL(items);
+    return parseGeneric(items);
+  }
+
+  // ── Shared columnar parser ────────────────────────────────────────────────────
+  // Used by all banks that have a Débit / Crédit column layout.
+  // opts.bankName     : display name
+  // opts.dateRE       : regex with capture groups (day, month) or (day, month, year)
+  // opts.buildDate    : fn(match, fallbackYear) => "DD/MM/YYYY" string
+  // opts.isNoise      : fn(texts, line) => bool  — rows to skip
+  // opts.balanceRE    : { open, close } regexes against the full joined text (optional)
+  // opts.isContinuation : fn(texts) => bool      — lines to append to previous row (optional)
+  function parseColumnar(items, opts) {
+    const rows = groupByY(items, 4);
     const allText = items.map(i => i.text).join(' ');
-    return /cr.dit\s+agricole/i.test(allText) ? parseCreditAgricole(items) : parseGeneric(items);
+
+    // Detect Débit / Crédit column X positions from the header row
+    let debitX = null, creditX = null;
+    for (const row of rows) {
+      const d = row.find(it => /^d[eé]bit$/i.test(it.text));
+      const c = row.find(it => /^cr[eé]dit$/i.test(it.text));
+      if (d && c) { debitX = d.x; creditX = c.x; break; }
+    }
+    if (debitX === null) { debitX = 415; creditX = 495; }
+    const midX = (debitX + creditX) / 2;
+
+    // Extract 4-digit year from document text
+    let year = new Date().getFullYear();
+    for (const it of items) {
+      const m = it.text.match(/\b(20\d{2})\b/);
+      if (m) { year = +m[1]; break; }
+    }
+
+    // Extract opening / closing balances via caller-supplied regexes
+    let openBalance = null, closeBalance = null, openDate = null, closeDate = null;
+    if (opts.balanceRE) {
+      const openM  = allText.match(opts.balanceRE.open);
+      const closeM = allText.match(opts.balanceRE.close);
+      if (openM)  { openDate  = openM[1];  openBalance  = openM[2].trim(); }
+      if (closeM) { closeDate = closeM[1]; closeBalance = closeM[2].trim(); }
+    }
+
+    const AMOUNT = /^\d{1,3}(\s\d{3})*(,\d{2})?$|^\d+,\d{2}$/;
+    const transactions = [];
+    let current = null;
+
+    for (const row of rows) {
+      row.sort((a, b) => a.x - b.x);
+      const texts = row.map(it => it.text).filter(Boolean);
+      if (!texts.length) continue;
+
+      const line = texts.join(' ');
+      if (opts.isNoise(texts, line)) continue;
+
+      // Find a date in the first 4 items
+      const dateIdx = texts.findIndex((t, i) => i < 4 && opts.dateRE.test(t));
+      const dateMatch = dateIdx >= 0 ? texts[dateIdx].match(opts.dateRE) : null;
+
+      if (dateMatch) {
+        if (current) transactions.push(current);
+
+        // Skip the second date (value date) if present
+        let descStart = dateIdx + 1;
+        if (texts[descStart] && opts.dateRE.test(texts[descStart])) descStart++;
+
+        // Find amount from right; classify debit vs credit by X position
+        const rowCopy = [...row];
+        let debit = '', credit = '';
+        for (let i = rowCopy.length - 1; i >= descStart; i--) {
+          if (AMOUNT.test(rowCopy[i].text.replace(/\s/g, ''))) {
+            if (rowCopy[i].x > midX) credit = rowCopy[i].text;
+            else                      debit  = rowCopy[i].text;
+            rowCopy.splice(i, 1);
+            break;
+          }
+        }
+
+        const rawDesc = rowCopy.slice(descStart).map(it => it.text).join(' ').trim();
+        current = {
+          'Date':        opts.buildDate(dateMatch, year),
+          'Type':        categorize(rawDesc),
+          'Description': cleanDescription(rawDesc),
+          '_rawDesc':    rawDesc,
+          'Débit':       debit,
+          'Crédit':      credit,
+        };
+      } else if (current && opts.isContinuation?.(texts)) {
+        current['Description'] += ' — ' + texts.join(' ');
+      }
+    }
+
+    if (current) transactions.push(current);
+
+    return {
+      rows:    transactions.map(({ _rawDesc, ...r }) => r),
+      columns: ['Date', 'Type', 'Description', 'Débit', 'Crédit'],
+      meta:    { bank: opts.bankName, openBalance, closeBalance, openDate, closeDate },
+    };
+  }
+
+  // ── BNP Paribas ───────────────────────────────────────────────────────────────
+  // Date format: DD/MM/YYYY (modern) — full year in each date cell
+  // Header:      "Date | Nature des opérations | Valeur | Débit | Crédit"
+  // Balance:     "SOLDE CREDITEUR AU DD/MM/YYYY  X XXX,XX"
+  function parseBNP(items) {
+    return parseColumnar(items, {
+      bankName: 'BNP Paribas',
+      dateRE:   /^(\d{2})\/(\d{2})\/(\d{4})$/,
+      buildDate: ([, d, mo, yr]) => `${d}/${mo}/${yr}`,
+      balanceRE: {
+        open:  /solde\s+cr[eé]diteur\s+au\s+(\d{2}\/\d{2}\/\d{4})\D+([\d\s]+,\d{2})/i,
+        close: /nouveau\s+solde\s+cr[eé]diteur\s+au\s+(\d{2}\/\d{2}\/\d{4})\D+([\d\s]+,\d{2})/i,
+      },
+      isNoise: (texts, line) =>
+        /^(bnp|paribas|relevé|page\s+\d|date|nature|valeur|solde|votre\s+agence|iban|bic|n°\s+de\s+compte|total\s+des)/i.test(line)
+        || (/^\d{5,}$/.test(texts[0]) && texts.length <= 2),
+    });
+  }
+
+  // ── Société Générale ──────────────────────────────────────────────────────────
+  // Date format: DD/MM/YYYY
+  // Balance:     "SOLDE PRECEDENT AU DD/MM/YYYY  X XXX,XX"
+  //              "NOUVEAU SOLDE AU DD/MM/YYYY  X XXX,XX"
+  function parseSG(items) {
+    return parseColumnar(items, {
+      bankName: 'Société Générale',
+      dateRE:   /^(\d{2})\/(\d{2})\/(\d{4})$/,
+      buildDate: ([, d, mo, yr]) => `${d}/${mo}/${yr}`,
+      balanceRE: {
+        open:  /solde\s+pr[eé]c[eé]dent\s+au\s+(\d{2}\/\d{2}\/\d{4})\D+([\d\s]+,\d{2})/i,
+        close: /nouveau\s+solde\s+au\s+(\d{2}\/\d{2}\/\d{4})\D+([\d\s]+,\d{2})/i,
+      },
+      isNoise: (texts, line) =>
+        /^(soci[eé]t[eé]|g[eé]n[eé]rale|relevé|page\s+\d|date|libell[eé]|valeur|débit|crédit|solde|votre\s+agence|iban|bic|total\s+des)/i.test(line)
+        || (/^\d{5,}$/.test(texts[0]) && texts.length <= 2),
+    });
+  }
+
+  // ── Caisse d'Épargne ──────────────────────────────────────────────────────────
+  // Date format: DD/MM (no year in date cell — year extracted from document)
+  // Balance:     "SOLDE PRECEDENT AU DD/MM/YY  X XXX,XX"
+  //              "NOUVEAU SOLDE CREDITEUR AU DD/MM/YY  X XXX,XX"
+  function parseCEP(items) {
+    const year = (() => {
+      for (const it of items) { const m = it.text.match(/\b(20\d{2})\b/); if (m) return +m[1]; }
+      return new Date().getFullYear();
+    })();
+    return parseColumnar(items, {
+      bankName: "Caisse d'Épargne",
+      dateRE:   /^(\d{2})\/(\d{2})$/,
+      buildDate: ([, d, mo]) => `${d}/${mo}/${year}`,
+      balanceRE: {
+        open:  /solde\s+pr[eé]c[eé]dent\s+au\s+(\d{2}\/\d{2}\/\d{2})\s+([\d\s]+,\d{2})/i,
+        close: /nouveau\s+solde\s+cr[eé]diteur\s+au\s+(\d{2}\/\d{2}\/\d{2})\s+([\d\s]+,\d{2})/i,
+      },
+      isNoise: (texts, line) =>
+        /^(caisse|[eé]pargne|relevé|page\s+\d|date|libell[eé]|valeur|débit|crédit|solde\s+pr[eé]|nouveau\s+solde|votre\s+agence|iban|bic|total\s+des|d[eé]tail\s+des)/i.test(line)
+        || (/^\d{5,}$/.test(texts[0]) && texts.length <= 2),
+    });
+  }
+
+  // ── La Banque Postale ─────────────────────────────────────────────────────────
+  // Date format: DD/MM/YYYY
+  // Balance:     "SOLDE PRECEDENT AU DD/MM/YYYY  X XXX,XX"
+  //              "NOUVEAU SOLDE CREDITEUR AU DD/MM/YYYY  X XXX,XX"
+  function parseLBP(items) {
+    return parseColumnar(items, {
+      bankName: 'La Banque Postale',
+      dateRE:   /^(\d{2})\/(\d{2})\/(\d{4})$/,
+      buildDate: ([, d, mo, yr]) => `${d}/${mo}/${yr}`,
+      balanceRE: {
+        open:  /solde\s+pr[eé]c[eé]dent\s+au\s+(\d{2}\/\d{2}\/\d{4})\D+([\d\s]+,\d{2})/i,
+        close: /nouveau\s+solde\s+cr[eé]diteur\s+au\s+(\d{2}\/\d{2}\/\d{4})\D+([\d\s]+,\d{2})/i,
+      },
+      isNoise: (texts, line) =>
+        /^(banque\s+postale|la\s+poste|relevé|page\s+\d|date|libell[eé]|valeur|débit|crédit|solde|iban|bic|total\s+des|vos\s+op[eé]rations)/i.test(line)
+        || (/^\d{5,}$/.test(texts[0]) && texts.length <= 2),
+    });
+  }
+
+  // ── Crédit Mutuel ─────────────────────────────────────────────────────────────
+  // Date format: DD/MM/YYYY — similar structure to SG/BNP
+  function parseCM(items) {
+    return parseColumnar(items, {
+      bankName: 'Crédit Mutuel',
+      dateRE:   /^(\d{2})\/(\d{2})\/(\d{4})$/,
+      buildDate: ([, d, mo, yr]) => `${d}/${mo}/${yr}`,
+      balanceRE: {
+        open:  /ancien\s+solde\s+au\s+(\d{2}\/\d{2}\/\d{4})\D+([\d\s]+,\d{2})/i,
+        close: /nouveau\s+solde\s+au\s+(\d{2}\/\d{2}\/\d{4})\D+([\d\s]+,\d{2})/i,
+      },
+      isNoise: (texts, line) =>
+        /^(cr[eé]dit\s+mutuel|relevé|page\s+\d|date|libell[eé]|valeur|débit|crédit|solde|iban|bic|total\s+des)/i.test(line)
+        || (/^\d{5,}$/.test(texts[0]) && texts.length <= 2),
+    });
+  }
+
+  // ── LCL ──────────────────────────────────────────────────────────────────────
+  // Date format: DD/MM/YYYY
+  function parseLCL(items) {
+    return parseColumnar(items, {
+      bankName: 'LCL',
+      dateRE:   /^(\d{2})\/(\d{2})\/(\d{4})$/,
+      buildDate: ([, d, mo, yr]) => `${d}/${mo}/${yr}`,
+      balanceRE: {
+        open:  /solde\s+pr[eé]c[eé]dent\s+au\s+(\d{2}\/\d{2}\/\d{4})\D+([\d\s]+,\d{2})/i,
+        close: /nouveau\s+solde\s+au\s+(\d{2}\/\d{2}\/\d{4})\D+([\d\s]+,\d{2})/i,
+      },
+      isNoise: (texts, line) =>
+        /^(lcl|lyonnais|relevé|page\s+\d|date|libell[eé]|valeur|débit|crédit|solde|iban|bic|total\s+des)/i.test(line)
+        || (/^\d{5,}$/.test(texts[0]) && texts.length <= 2),
+    });
   }
 
   // Groups PDF text items by (page, Y) position to reconstruct rows.
@@ -516,7 +733,7 @@
       .replace(/^Avoir\s+Carte\s+X\w+\s+/i, '')
       .replace(/^Carte\s+X\w+\s+/i, '')
       .replace(/^Prlv\s+/i, '')
-      .replace(/^Virement\s+Vir\s+Inst\s+de\s+/i, '')
+      .replace(/^Virement\s+Vir\s+Inst\s+(?:Wero\s+)?de\s+/i, '')
       .replace(/^Virement\s+/i, '')
       .replace(/\s+\d{2}\/\d{2}$/, '')
       .replace(/\s{2,}/g, ' ')
