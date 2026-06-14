@@ -371,14 +371,6 @@
         <option value="&#9;">⇥ (tabulation)</option>
       </select>
     </div>
-    <div class="option-group">
-      <label for="date-col">Colonne date</label>
-      <input id="date-col" type="text" value="Date" placeholder="Date" style="width:90px"/>
-    </div>
-    <div class="option-group">
-      <label for="amount-col">Colonne montant</label>
-      <input id="amount-col" type="text" value="Montant" placeholder="Montant" style="width:110px"/>
-    </div>
   </div>
 
   <!-- Drop zone -->
@@ -427,69 +419,68 @@
 </footer>
 
 <script>
-  // PDF.js worker
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-  const dropZone   = document.getElementById('drop-zone');
-  const fileInput  = document.getElementById('file-input');
+  const dropZone    = document.getElementById('drop-zone');
+  const fileInput   = document.getElementById('file-input');
   const progressSec = document.getElementById('progress-section');
   const progressBar = document.getElementById('progress-bar');
   const progressLbl = document.getElementById('progress-label');
-  const resultsSec = document.getElementById('results-section');
-  const errorBox   = document.getElementById('error-box');
-  const tableHead  = document.getElementById('table-head');
-  const tableBody  = document.getElementById('table-body');
+  const resultsSec  = document.getElementById('results-section');
+  const errorBox    = document.getElementById('error-box');
+  const tableHead   = document.getElementById('table-head');
+  const tableBody   = document.getElementById('table-body');
   const resultsMeta = document.getElementById('results-meta');
 
-  let parsedRows = [];
-  let columns    = [];
+  let parsedRows = [], columns = [];
 
-  // --- Drag & Drop ---
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
   dropZone.addEventListener('drop', e => {
     e.preventDefault();
     dropZone.classList.remove('drag-over');
-    const file = e.dataTransfer.files[0];
-    if (file && file.type === 'application/pdf') processFile(file);
+    const f = e.dataTransfer.files[0];
+    if (f && f.type === 'application/pdf') processFile(f);
     else showError('Veuillez déposer un fichier PDF.');
   });
-  fileInput.addEventListener('change', e => {
-    if (e.target.files[0]) processFile(e.target.files[0]);
-  });
-
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
   document.getElementById('btn-reset').addEventListener('click', reset);
   document.getElementById('btn-download').addEventListener('click', downloadCSV);
 
-  // --- Process ---
+  // ── Extract items with (x, y) positions from all pages ──────────────────────
   async function processFile(file) {
     reset(false);
     setProgress(0, `Chargement de "${file.name}"…`);
     showProgress(true);
-
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      const totalPages = pdf.numPages;
+      const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+      const n = pdf.numPages;
+      let allItems = [];
 
-      let allLines = [];
-
-      for (let i = 1; i <= totalPages; i++) {
-        setProgress(Math.round((i / totalPages) * 80), `Page ${i} / ${totalPages}…`);
-        const page = await pdf.getPage(i);
+      for (let p = 1; p <= n; p++) {
+        setProgress(Math.round((p / n) * 80), `Page ${p} / ${n}…`);
+        const page = await pdf.getPage(p);
+        const vp = page.getViewport({ scale: 1 });
         const content = await page.getTextContent();
-        const lines = groupIntoLines(content.items);
-        allLines = allLines.concat(lines);
+        for (const item of content.items) {
+          if (!item.str.trim()) continue;
+          allItems.push({
+            x: item.transform[4],
+            y: vp.height - item.transform[5], // flip to top-left origin
+            text: item.str.trim(),
+            page: p
+          });
+        }
       }
 
       setProgress(90, 'Analyse des transactions…');
-      const result = parseTransactions(allLines);
+      const result = detectAndParse(allItems);
       parsedRows = result.rows;
       columns    = result.columns;
 
-      if (parsedRows.length === 0) {
-        showError('Aucune transaction détectée. Le format de ce relevé n\'est peut-être pas encore pris en charge. Vous pouvez modifier les cellules du tableau manuellement si certaines lignes ont été extraites.');
+      if (!parsedRows.length) {
+        showError('Aucune transaction détectée. Ce format de relevé n\'est peut-être pas encore pris en charge.');
         return;
       }
 
@@ -501,155 +492,194 @@
     }
   }
 
-  // Group PDF text items into lines by Y position
-  function groupIntoLines(items) {
-    const lineMap = {};
-    for (const item of items) {
-      const y = Math.round(item.transform[5]);
-      if (!lineMap[y]) lineMap[y] = [];
-      lineMap[y].push({ x: item.transform[4], text: item.str });
-    }
-    return Object.entries(lineMap)
-      .sort((a, b) => Number(b[0]) - Number(a[0]))
-      .map(([, cells]) => {
-        cells.sort((a, b) => a.x - b.x);
-        return cells.map(c => c.text.trim()).filter(Boolean).join(' | ');
-      })
-      .filter(l => l.length > 0);
+  // ── Router ───────────────────────────────────────────────────────────────────
+  function detectAndParse(items) {
+    const allText = items.map(i => i.text).join(' ');
+    if (/cr.dit\s+agricole/i.test(allText)) return parseCreditAgricole(items);
+    return parseGeneric(items);
   }
 
-  // Heuristic parser: detect date, description, amount patterns
-  function parseTransactions(lines) {
-    const dateLabel  = document.getElementById('date-col').value || 'Date';
-    const amountLabel = document.getElementById('amount-col').value || 'Montant';
+  // ── Group items by Y position (within tolerance) ─────────────────────────────
+  function groupByY(items, tol = 3) {
+    const sorted = [...items].sort((a, b) => a.y - b.y || a.x - b.x);
+    const groups = [];
+    for (const item of sorted) {
+      const last = groups[groups.length - 1];
+      if (last && Math.abs(last[0].y - item.y) <= tol) last.push(item);
+      else groups.push([item]);
+    }
+    return groups;
+  }
 
-    // Patterns for dates (DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, YYYY-MM-DD)
-    const dateRe = /\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{2}[\/\-\.]\d{2})\b/;
-    // Amount: optional sign, digits, optional decimal
-    const amountRe = /([+\-]?\s?\d{1,3}(?:[\s.]\d{3})*(?:[,\.]\d{1,2})?)\s*([€$£])?/;
+  // ── Crédit Agricole parser ───────────────────────────────────────────────────
+  function parseCreditAgricole(items) {
+    const rows = groupByY(items, 4);
+    const norm = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-    const rows = [];
+    // Detect Débit / Crédit column X positions from the table header row
+    let debitX = null, creditX = null;
+    for (const row of rows) {
+      const dItem = row.find(it => norm(it.text) === 'debit');
+      const cItem = row.find(it => norm(it.text) === 'credit');
+      if (dItem && cItem) { debitX = dItem.x; creditX = cItem.x; break; }
+    }
+    // Fallback: typical Crédit Agricole A4 layout at scale 1
+    if (debitX === null) { debitX = 415; creditX = 495; }
+    const midX = (debitX + creditX) / 2;
 
-    for (const line of lines) {
-      const dateMatch = line.match(dateRe);
-      if (!dateMatch) continue;
+    // Extract year from any full date found in the document
+    let year = new Date().getFullYear();
+    for (const it of items) {
+      const m = it.text.match(/\b(20\d{2})\b/);
+      if (m) { year = +m[1]; break; }
+    }
 
-      const date = dateMatch[1];
-      let rest = line;
+    const DD_MM    = /^(\d{2})\.(\d{2})$/;
+    const AMOUNT   = /^\d{1,3}(\s\d{3})*(,\d{2})?$|^\d+,\d{2}$/;
 
-      // Try to extract amount (look for last numeric-looking token)
-      const parts = line.split(' | ');
+    // Lines to skip (headers, footers, account info, reference codes)
+    function isNoise(texts) {
+      const t = texts.join(' ');
+      if (/^relev[eéé]/i.test(texts[0])) return true;
+      if (/^(cr[eé]dit\s+agricole|sud\s+rh|date\s+d|libell[eé]|synth[eé]|monsieur\s|compte\s+ch|iban\s*:|bic\s*:|vos\s+r[eé]|le\s+mont|taeg|indice|www\.|page\s+\d|total\s+des|ancien\s+solde|nouveau\s+solde|t[eé]l\s*:|fax\s*:|sos\s+perte|votre\s+(agence|conseiller))/i.test(t)) return true;
+      // Pure numeric codes (account numbers etc.)
+      if (/^\d{5,}$/.test(texts[0]) && texts.length === 1) return true;
+      return false;
+    }
+
+    function isRefCode(texts) {
+      const t = texts.join('');
+      // Long alphanumeric reference codes or SEPA mandate IDs
+      return /^[A-Z0-9\/\-\.]{14,}$/.test(t) || /FR\d{2}ZZZ/i.test(t);
+    }
+
+    const transactions = [];
+    let current = null;
+
+    for (const row of rows) {
+      row.sort((a, b) => a.x - b.x);
+      const texts = row.map(it => it.text).filter(Boolean);
+      if (!texts.length) continue;
+      if (isNoise(texts) || isRefCode(texts)) continue;
+
+      const m0 = texts[0].match(DD_MM);
+      if (m0) {
+        if (current) transactions.push(current);
+
+        // Second token may also be a date (date valeur)
+        let descStart = 1;
+        if (texts[1] && texts[1].match(DD_MM)) descStart = 2;
+
+        // Find the amount among this row's items (rightmost valid number)
+        const rowCopy = [...row];
+        let debit = '', credit = '';
+        for (let i = rowCopy.length - 1; i >= descStart; i--) {
+          const clean = rowCopy[i].text.replace(/\s/g, '');
+          if (AMOUNT.test(clean)) {
+            if (rowCopy[i].x > midX) credit = rowCopy[i].text;
+            else debit = rowCopy[i].text;
+            rowCopy.splice(i, 1);
+            break;
+          }
+        }
+
+        const desc = rowCopy.slice(descStart).map(it => it.text).join(' ').trim();
+        const [, d, mo] = m0;
+        current = { 'Date': `${d}/${mo}/${year}`, 'Description': desc, 'Débit': debit, 'Crédit': credit };
+      }
+      // Continuation lines (multi-line descriptions / references) are intentionally skipped
+      // to keep the CSV clean. Only the first line of each transaction is kept.
+    }
+
+    if (current) transactions.push(current);
+    return { rows: transactions, columns: ['Date', 'Description', 'Débit', 'Crédit'] };
+  }
+
+  // ── Generic fallback parser ──────────────────────────────────────────────────
+  function parseGeneric(items) {
+    const rows = groupByY(items, 3);
+    const DATE_RE   = /\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})\b/;
+    const AMOUNT_RE = /^\d{1,3}([.,]\d{3})*[.,]\d{2}$/;
+    const result = [];
+
+    for (const row of rows) {
+      row.sort((a, b) => a.x - b.x);
+      const texts = row.map(it => it.text.trim()).filter(Boolean);
+      const line  = texts.join(' ');
+      const dm    = line.match(DATE_RE);
+      if (!dm) continue;
+
       let amount = '';
-      let description = '';
-
-      // Scan from right for a numeric part that looks like a money amount
-      for (let i = parts.length - 1; i >= 0; i--) {
-        const clean = parts[i].replace(/\s/g, '');
-        if (/^[+\-]?\d{1,3}([.,]\d{3})*([.,]\d{1,2})?[€$£]?$/.test(clean) ||
-            /^[€$£]?[+\-]?\d{1,3}([.,]\d{3})*([.,]\d{1,2})?$/.test(clean)) {
-          amount = parts[i];
-          parts.splice(i, 1);
+      const filtered = [...texts];
+      for (let i = filtered.length - 1; i >= 0; i--) {
+        if (AMOUNT_RE.test(filtered[i].replace(/\s/g, ''))) {
+          amount = filtered[i];
+          filtered.splice(i, 1);
           break;
         }
       }
-
-      // Remaining parts minus the date become description
-      description = parts
-        .join(' ')
-        .replace(dateMatch[0], '')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
-
-      rows.push({ [dateLabel]: date, 'Description': description, [amountLabel]: amount });
+      const desc = filtered.join(' ').replace(dm[0], '').replace(/\s{2,}/g, ' ').trim();
+      result.push({ 'Date': dm[1], 'Description': desc, 'Montant': amount });
     }
 
-    const cols = rows.length > 0 ? Object.keys(rows[0]) : [dateLabel, 'Description', amountLabel];
-    return { rows, columns: cols };
+    return { rows: result, columns: ['Date', 'Description', 'Montant'] };
   }
 
+  // ── Render ───────────────────────────────────────────────────────────────────
   function renderTable() {
-    // Header
-    tableHead.innerHTML = '<tr>' + columns.map(c => `<th>${c}</th>`).join('') + '</tr>';
+    tableHead.innerHTML = '<tr>' + columns.map(c => `<th>${escHtml(c)}</th>`).join('') + '</tr>';
 
-    // Body
-    const amountLabel = document.getElementById('amount-col').value || 'Montant';
     tableBody.innerHTML = parsedRows.map((row, ri) =>
       '<tr>' + columns.map(col => {
-        const val = row[col] ?? '';
+        const val  = row[col] ?? '';
+        const colN = col.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
         let cls = '';
-        if (col === amountLabel) {
-          const num = parseFloat(val.replace(/[^\d,.\-+]/g, '').replace(',', '.'));
-          if (!isNaN(num)) cls = num >= 0 ? 'amount-pos' : 'amount-neg';
+        if (colN === 'debit')   cls = val ? 'amount-neg' : '';
+        else if (colN === 'credit') cls = val ? 'amount-pos' : '';
+        else if (colN === 'montant') {
+          const n = parseFloat(val.replace(/[^\d,.\-+]/g, '').replace(',', '.'));
+          if (!isNaN(n)) cls = n >= 0 ? 'amount-pos' : 'amount-neg';
         }
         return `<td contenteditable="true" class="${cls}" data-row="${ri}" data-col="${col}">${escHtml(val)}</td>`;
       }).join('') + '</tr>'
     ).join('');
 
-    // Sync edits back to parsedRows
     tableBody.querySelectorAll('td[contenteditable]').forEach(td => {
-      td.addEventListener('input', () => {
-        parsedRows[+td.dataset.row][td.dataset.col] = td.textContent;
-      });
+      td.addEventListener('input', () => { parsedRows[+td.dataset.row][td.dataset.col] = td.textContent; });
     });
 
-    resultsMeta.textContent = `${parsedRows.length} transaction${parsedRows.length > 1 ? 's' : ''} détectée${parsedRows.length > 1 ? 's' : ''}`;
+    const n = parsedRows.length;
+    resultsMeta.textContent = `${n} transaction${n > 1 ? 's' : ''} détectée${n > 1 ? 's' : ''}`;
   }
 
+  // ── CSV Download ─────────────────────────────────────────────────────────────
   function downloadCSV() {
     const sep = document.getElementById('sep').value;
-    const header = columns.join(sep);
-    const body = parsedRows.map(row =>
-      columns.map(col => `"${(row[col] ?? '').replace(/"/g, '""')}"`).join(sep)
-    ).join('\n');
-    const csv = header + '\n' + body;
+    const csv = [columns.join(sep),
+      ...parsedRows.map(row => columns.map(col => `"${(row[col] ?? '').replace(/"/g, '""')}"`).join(sep))
+    ].join('\n');
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'releve_' + new Date().toISOString().slice(0,10) + '.csv';
+    const a = Object.assign(document.createElement('a'), {
+      href: URL.createObjectURL(blob),
+      download: 'releve_' + new Date().toISOString().slice(0, 10) + '.csv'
+    });
     a.click();
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(a.href);
   }
 
-  function showProgress(visible) {
-    progressSec.style.display = visible ? 'block' : 'none';
-  }
-
-  function setProgress(pct, label) {
-    progressBar.style.width = pct + '%';
-    progressLbl.textContent = label;
-  }
-
-  function showResults() {
-    showProgress(false);
-    resultsSec.style.display = 'block';
-    dropZone.style.display = 'none';
-  }
-
-  function showError(msg) {
-    showProgress(false);
-    errorBox.style.display = 'block';
-    errorBox.textContent = '⚠ ' + msg;
-  }
+  // ── Helpers ──────────────────────────────────────────────────────────────────
+  function showProgress(v)      { progressSec.style.display = v ? 'block' : 'none'; }
+  function setProgress(p, lbl)  { progressBar.style.width = p + '%'; progressLbl.textContent = lbl; }
+  function showResults()        { showProgress(false); resultsSec.style.display = 'block'; dropZone.style.display = 'none'; }
+  function showError(msg)       { showProgress(false); errorBox.style.display = 'block'; errorBox.textContent = '⚠ ' + msg; }
+  function escHtml(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   function reset(showDrop = true) {
-    parsedRows = [];
-    columns = [];
-    tableHead.innerHTML = '';
-    tableBody.innerHTML = '';
-    resultsMeta.textContent = '';
-    resultsSec.style.display = 'none';
-    errorBox.style.display = 'none';
-    showProgress(false);
-    progressBar.style.width = '0%';
-    if (showDrop) {
-      dropZone.style.display = 'block';
-      fileInput.value = '';
-    }
-  }
-
-  function escHtml(str) {
-    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    parsedRows = []; columns = [];
+    tableHead.innerHTML = ''; tableBody.innerHTML = ''; resultsMeta.textContent = '';
+    resultsSec.style.display = 'none'; errorBox.style.display = 'none';
+    showProgress(false); progressBar.style.width = '0%';
+    if (showDrop) { dropZone.style.display = 'block'; fileInput.value = ''; }
   }
 </script>
 </body>
