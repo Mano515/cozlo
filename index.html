@@ -495,7 +495,7 @@
       const res = await fetch('https://api.gumroad.com/v2/licenses/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `product_permalink=${GUMROAD_PRODUCT}&license_key=${encodeURIComponent(key.trim())}&increment_uses_count=false`,
+        body: `product_id=${GUMROAD_PRODUCT}&license_key=${encodeURIComponent(key.trim())}&increment_uses_count=false`,
       });
       const data = await res.json();
       console.log('Gumroad response:', data);
