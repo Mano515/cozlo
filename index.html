@@ -222,6 +222,106 @@
     /* ── Footer ──────────────────────────────────────────────────────────────── */
     footer { text-align: center; padding: 20px; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border); }
 
+    /* ── Paywall ─────────────────────────────────────────────────────────────── */
+    #paywall {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 48px 24px;
+      gap: 32px;
+      text-align: center;
+    }
+    .paywall-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 48px;
+      max-width: 480px;
+      width: 100%;
+    }
+    .paywall-price {
+      font-size: 48px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      color: var(--text);
+      margin: 16px 0 4px;
+    }
+    .paywall-price span { color: var(--accent-light); }
+    .paywall-desc {
+      font-size: 14px;
+      color: var(--text-muted);
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+    .paywall-features {
+      list-style: none;
+      text-align: left;
+      font-size: 14px;
+      color: var(--text-muted);
+      margin-bottom: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .paywall-features li::before { content: '✓  '; color: var(--green); font-weight: 700; }
+    .btn-buy {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 16px;
+      padding: 14px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-weight: 700;
+      transition: opacity 0.15s;
+      text-decoration: none;
+      display: block;
+      margin-bottom: 24px;
+    }
+    .btn-buy:hover { opacity: 0.88; }
+    .paywall-divider {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+    .paywall-divider::before, .paywall-divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+    .key-row {
+      display: flex;
+      gap: 8px;
+    }
+    .key-input {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 10px 14px;
+      font-size: 13px;
+      font-family: 'SF Mono', 'Fira Mono', monospace;
+      letter-spacing: 0.5px;
+      outline: none;
+    }
+    .key-input:focus { border-color: var(--accent); }
+    .key-input::placeholder { color: var(--text-muted); letter-spacing: 0; font-family: inherit; }
+    .key-error {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--red);
+      min-height: 16px;
+    }
+    #app { display: none; }
+
     /* ── Responsive — large screens (≥1100px) ───────────────────────────────── */
     @media (min-width: 1100px) {
       main { padding: 80px 48px; gap: 40px; }
@@ -267,9 +367,41 @@
 </head>
 <body>
 
+<!-- ── Paywall (shown until license verified) ──────────────────────────────── -->
+<div id="paywall">
+  <div class="paywall-card">
+    <div class="logo" style="font-size:26px;font-weight:700;margin-bottom:8px">Coz<span style="color:var(--accent-light)">lo</span></div>
+    <div class="paywall-price"><span>15</span> €</div>
+    <p class="paywall-desc">Accès à vie — paiement unique, sans abonnement.</p>
+    <ul class="paywall-features">
+      <li>Conversion PDF → CSV 100% dans le navigateur</li>
+      <li>Crédit Agricole, BNP, SG, Caisse d'Épargne…</li>
+      <li>Données jamais envoyées à un serveur</li>
+      <li>Toutes les mises à jour incluses</li>
+    </ul>
+    <a id="btn-buy" class="btn-buy" href="https://cozlo.gumroad.com/l/cozlo" target="_blank" rel="noopener">
+      Acheter maintenant →
+    </a>
+    <div class="paywall-divider">J'ai déjà une clé</div>
+    <div class="key-row">
+      <input id="license-input" class="key-input" type="text"
+             placeholder="XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX" autocomplete="off" spellcheck="false" />
+      <button id="btn-verify" class="btn btn-primary" style="white-space:nowrap">Activer</button>
+    </div>
+    <div id="key-error" class="key-error"></div>
+  </div>
+</div>
+
+<!-- ── App (hidden until license verified) ────────────────────────────────── -->
+<div id="app">
+
 <header>
   <div class="logo">Coz<span>lo</span></div>
   <div class="tagline">PDF bancaire → CSV</div>
+  <button id="btn-logout" title="Changer de licence"
+          style="margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;padding:4px 8px;border-radius:6px">
+    🔑 Licence
+  </button>
 </header>
 
 <main>
@@ -349,7 +481,86 @@
   <p>Cozlo — aucune donnée ne quitte votre navigateur &nbsp;·&nbsp; 2025</p>
 </footer>
 
+</div><!-- /#app -->
+
 <script>
+  // ── Licence ───────────────────────────────────────────────────────────────────
+  // Update GUMROAD_PRODUCT with your product permalink once created on Gumroad.
+  const GUMROAD_PRODUCT  = 'cozlo';
+  const LICENSE_STORAGE  = 'cozlo_license';
+
+  const paywall      = document.getElementById('paywall');
+  const app          = document.getElementById('app');
+  const licenseInput = document.getElementById('license-input');
+  const btnVerify    = document.getElementById('btn-verify');
+  const keyError     = document.getElementById('key-error');
+
+  function showApp() {
+    paywall.style.display = 'none';
+    app.style.display     = 'block';
+  }
+
+  function showPaywall(errorMsg = '') {
+    app.style.display     = 'none';
+    paywall.style.display = 'flex';
+    keyError.textContent  = errorMsg;
+  }
+
+  async function verifyKey(key) {
+    try {
+      const res = await fetch('https://api.gumroad.com/v2/licenses/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `product_permalink=${GUMROAD_PRODUCT}&license_key=${encodeURIComponent(key.trim())}`,
+      });
+      const data = await res.json();
+      return data.success === true;
+    } catch {
+      return false; // network error — don't block the user silently
+    }
+  }
+
+  async function activate(key) {
+    if (!key.trim()) { keyError.textContent = 'Entrez votre clé de licence.'; return; }
+    btnVerify.textContent = '…';
+    btnVerify.disabled    = true;
+    keyError.textContent  = '';
+
+    const valid = await verifyKey(key);
+
+    btnVerify.textContent = 'Activer';
+    btnVerify.disabled    = false;
+
+    if (valid) {
+      localStorage.setItem(LICENSE_STORAGE, key.trim());
+      showApp();
+    } else {
+      keyError.textContent = 'Clé invalide ou déjà utilisée sur un autre appareil.';
+    }
+  }
+
+  // Check URL param ?key=... (Gumroad can redirect here after purchase)
+  const urlKey = new URLSearchParams(location.search).get('key');
+  if (urlKey) licenseInput.value = urlKey;
+
+  // Check stored key
+  const storedKey = localStorage.getItem(LICENSE_STORAGE);
+  if (storedKey) {
+    showApp();
+  } else {
+    showPaywall();
+  }
+
+  btnVerify.addEventListener('click', () => activate(licenseInput.value));
+  licenseInput.addEventListener('keydown', e => { if (e.key === 'Enter') activate(licenseInput.value); });
+
+  document.getElementById('btn-logout').addEventListener('click', () => {
+    if (confirm('Supprimer la licence enregistrée ?')) {
+      localStorage.removeItem(LICENSE_STORAGE);
+      showPaywall();
+    }
+  });
+
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
