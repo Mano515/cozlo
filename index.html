@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cozlo — PDF bancaire vers CSV</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -437,7 +438,8 @@
         <button type="button" class="btn btn-ghost" id="btn-reset">↩ Nouveau fichier</button>
         <button type="button" class="btn btn-ghost" id="btn-add">+ Ajouter un relevé</button>
         <input type="file" id="file-add" accept=".pdf" style="display:none" />
-        <button type="button" class="btn btn-primary" id="btn-download">⬇ Télécharger CSV</button>
+        <button type="button" class="btn btn-primary" id="btn-download-csv">⬇ CSV</button>
+        <button type="button" class="btn btn-primary" id="btn-download-xlsx">⬇ Excel</button>
       </div>
     </div>
     <div id="summary-bar" class="summary-bar" style="display:none"></div>
@@ -635,9 +637,13 @@
     if (!isLicensed()) { openLicenseModal(); return; }
     fileAdd.click();
   });
-  document.getElementById('btn-download').addEventListener('click', () => {
+  document.getElementById('btn-download-csv').addEventListener('click', () => {
     if (!isLicensed()) { openLicenseModal(); return; }
     downloadCSV();
+  });
+  document.getElementById('btn-download-xlsx').addEventListener('click', () => {
+    if (!isLicensed()) { openLicenseModal(); return; }
+    downloadXLSX();
   });
 
   // ── PDF processing ───────────────────────────────────────────────────────────
@@ -1189,6 +1195,14 @@
   }
 
   // ── CSV export ────────────────────────────────────────────────────────────────
+
+  function downloadXLSX() {
+    const data = [columns, ...parsedRows.map(row => columns.map(col => row[col] ?? ''))];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Relevé');
+    XLSX.writeFile(wb, 'releve_' + new Date().toISOString().slice(0, 10) + '.xlsx');
+  }
 
   function downloadCSV() {
     const sep = document.getElementById('sep').value;
