@@ -495,11 +495,16 @@
       const res = await fetch('https://api.gumroad.com/v2/licenses/verify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: `product_permalink=${GUMROAD_PRODUCT}&license_key=${encodeURIComponent(key.trim())}`,
+        body: `product_permalink=${GUMROAD_PRODUCT}&license_key=${encodeURIComponent(key.trim())}&increment_uses_count=false`,
       });
       const data = await res.json();
-      return data.success === true;
-    } catch {
+      console.log('Gumroad response:', data);
+      if (data.success === true) return true;
+      keyError.textContent = data.message || 'Clé invalide.';
+      return false;
+    } catch (e) {
+      console.error('Gumroad error:', e);
+      keyError.textContent = 'Erreur réseau — réessayez.';
       return false;
     }
   }
