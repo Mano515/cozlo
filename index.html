@@ -273,7 +273,15 @@
       text-transform: uppercase;
       letter-spacing: 0.5px;
       white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
     }
+
+    th:hover { color: var(--text); }
+    th .sort-icon { margin-left: 4px; opacity: 0.4; font-style: normal; }
+    th.sort-asc .sort-icon::after  { content: '↑'; opacity: 1; }
+    th.sort-desc .sort-icon::after { content: '↓'; opacity: 1; }
+    th:not(.sort-asc):not(.sort-desc) .sort-icon::after { content: '↕'; }
 
     td {
       padding: 11px 16px;
@@ -285,6 +293,44 @@
 
     .amount-pos { color: var(--green); }
     .amount-neg { color: var(--red); }
+
+    tfoot td {
+      padding: 11px 16px;
+      border-top: 2px solid var(--border);
+      font-weight: 700;
+      font-size: 13px;
+      background: var(--surface2);
+    }
+
+    /* Summary bar */
+    .summary-bar {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 18px;
+      font-size: 13px;
+      width: 100%;
+      max-width: 760px;
+    }
+
+    .summary-item { display: flex; flex-direction: column; gap: 2px; }
+    .summary-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
+    .summary-value { font-weight: 600; font-size: 15px; }
+    .summary-sep { width: 1px; height: 32px; background: var(--border); }
+
+    .bank-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #1e2a1e; border: 1px solid #2e5c2e;
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 12px; color: #4ade80;
+    }
+    .bank-badge.generic {
+      background: #1e1e2a; border-color: var(--border); color: var(--text-muted);
+    }
 
     /* Editable cell */
     td[contenteditable="true"]:focus {
@@ -405,10 +451,12 @@
         <button class="btn btn-primary" id="btn-download">⬇ Télécharger CSV</button>
       </div>
     </div>
-    <div class="table-wrap">
+    <div id="summary-bar" class="summary-bar" style="display:none"></div>
+    <div class="table-wrap" style="margin-top:16px">
       <table id="results-table">
         <thead id="table-head"></thead>
         <tbody id="table-body"></tbody>
+        <tfoot id="table-foot"></tfoot>
       </table>
     </div>
   </div>
@@ -431,9 +479,12 @@
   const errorBox    = document.getElementById('error-box');
   const tableHead   = document.getElementById('table-head');
   const tableBody   = document.getElementById('table-body');
+  const tableFoot   = document.getElementById('table-foot');
+  const summaryBar  = document.getElementById('summary-bar');
   const resultsMeta = document.getElementById('results-meta');
 
-  let parsedRows = [], columns = [];
+  let parsedRows = [], columns = [], sortState = { col: null, dir: 1 };
+  let meta = { bank: null, openBalance: null, closeBalance: null, openDate: null, closeDate: null };
 
   dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
   dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
@@ -465,19 +516,21 @@
         const content = await page.getTextContent();
         for (const item of content.items) {
           if (!item.str.trim()) continue;
-          allItems.push({
-            x: item.transform[4],
-            y: vp.height - item.transform[5], // flip to top-left origin
-            text: item.str.trim(),
-            page: p
-          });
+          allItems.push({ x: item.transform[4], y: vp.height - item.transform[5], text: item.str.trim(), page: p });
         }
+      }
+
+      // Detect scanned PDF (image-only, no extractable text)
+      if (allItems.length < 20) {
+        showError('Ce PDF semble être un scan (image). Cozlo nécessite un PDF avec du texte sélectionnable. Essayez d\'exporter votre relevé directement depuis l\'espace client de votre banque.');
+        return;
       }
 
       setProgress(90, 'Analyse des transactions…');
       const result = detectAndParse(allItems);
       parsedRows = result.rows;
       columns    = result.columns;
+      meta       = result.meta;
 
       if (!parsedRows.length) {
         showError('Aucune transaction détectée. Ce format de relevé n\'est peut-être pas encore pris en charge.');
@@ -485,6 +538,7 @@
       }
 
       setProgress(100, 'Terminé !');
+      renderSummary();
       renderTable();
       showResults();
     } catch (err) {
@@ -511,46 +565,56 @@
     return groups;
   }
 
+  const normStr = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
   // ── Crédit Agricole parser ───────────────────────────────────────────────────
   function parseCreditAgricole(items) {
     const rows = groupByY(items, 4);
-    const norm = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
     // Detect Débit / Crédit column X positions from the table header row
     let debitX = null, creditX = null;
     for (const row of rows) {
-      const dItem = row.find(it => norm(it.text) === 'debit');
-      const cItem = row.find(it => norm(it.text) === 'credit');
+      const dItem = row.find(it => normStr(it.text) === 'debit');
+      const cItem = row.find(it => normStr(it.text) === 'credit');
       if (dItem && cItem) { debitX = dItem.x; creditX = cItem.x; break; }
     }
-    // Fallback: typical Crédit Agricole A4 layout at scale 1
     if (debitX === null) { debitX = 415; creditX = 495; }
     const midX = (debitX + creditX) / 2;
 
-    // Extract year from any full date found in the document
+    // Extract year from any full 4-digit year in the document
     let year = new Date().getFullYear();
     for (const it of items) {
       const m = it.text.match(/\b(20\d{2})\b/);
       if (m) { year = +m[1]; break; }
     }
 
-    const DD_MM    = /^(\d{2})\.(\d{2})$/;
-    const AMOUNT   = /^\d{1,3}(\s\d{3})*(,\d{2})?$|^\d+,\d{2}$/;
+    // Extract opening/closing balances
+    let openBalance = null, closeBalance = null, openDate = null, closeDate = null;
+    const allText = items.map(i => i.text).join(' ');
+    const openM  = allText.match(/ancien\s+solde\s+cr[eé]diteur\s+au\s+(\d{2}\.\d{2}\.\d{4})\s+([\d\s]+,\d{2})/i);
+    const closeM = allText.match(/nouveau\s+solde\s+cr[eé]diteur\s+au\s+(\d{2}\.\d{2}\.\d{4})\s+([\d\s]+,\d{2})/i);
+    if (openM)  { openDate  = openM[1];  openBalance  = openM[2].trim(); }
+    if (closeM) { closeDate = closeM[1]; closeBalance = closeM[2].trim(); }
 
-    // Lines to skip (headers, footers, account info, reference codes)
+    const DD_MM  = /^(\d{2})\.(\d{2})$/;
+    const AMOUNT = /^\d{1,3}(\s\d{3})*(,\d{2})?$|^\d+,\d{2}$/;
+
     function isNoise(texts) {
       const t = texts.join(' ');
-      if (/^relev[eéé]/i.test(texts[0])) return true;
-      if (/^(cr[eé]dit\s+agricole|sud\s+rh|date\s+d|libell[eé]|synth[eé]|monsieur\s|compte\s+ch|iban\s*:|bic\s*:|vos\s+r[eé]|le\s+mont|taeg|indice|www\.|page\s+\d|total\s+des|ancien\s+solde|nouveau\s+solde|t[eé]l\s*:|fax\s*:|sos\s+perte|votre\s+(agence|conseiller))/i.test(t)) return true;
-      // Pure numeric codes (account numbers etc.)
-      if (/^\d{5,}$/.test(texts[0]) && texts.length === 1) return true;
+      if (/^relev[eé]/i.test(texts[0])) return true;
+      if (/^(cr[eé]dit\s+agricole|sud\s+rh|date\s+d|libell[eé]|synth[eé]|monsieur\s|compte\s+ch[eè]|iban\s*:|bic\s*:|vos\s+r[eé]|le\s+mont|le\s+taux|taeg|indice|www\.|page\s+\d|total\s+des|ancien\s+solde|nouveau\s+solde|t[eé]l\s*[:\-]|fax\s*:|sos\s+perte|votre\s+(agence|conseiller)|il\s+est\s+possible|compte\s+n[°o])/i.test(t)) return true;
+      if (/^\d{4,}$/.test(texts[0]) && texts.length <= 2) return true;
       return false;
     }
 
     function isRefCode(texts) {
       const t = texts.join('');
-      // Long alphanumeric reference codes or SEPA mandate IDs
-      return /^[A-Z0-9\/\-\.]{14,}$/.test(t) || /FR\d{2}ZZZ/i.test(t);
+      return /^[A-Z0-9\/\-\.]{14,}$/.test(t) || /FR\d{2}ZZZ/i.test(t) || /^[0-9]{6,}\//.test(t);
+    }
+
+    function isContinuation(texts) {
+      // Human-readable continuation lines worth appending (e.g. exchange rate)
+      return /^mt\s+initial/i.test(texts.join(' '));
     }
 
     const transactions = [];
@@ -560,17 +624,16 @@
       row.sort((a, b) => a.x - b.x);
       const texts = row.map(it => it.text).filter(Boolean);
       if (!texts.length) continue;
-      if (isNoise(texts) || isRefCode(texts)) continue;
+      if (isNoise(texts)) continue;
+      if (isRefCode(texts)) continue;
 
       const m0 = texts[0].match(DD_MM);
       if (m0) {
         if (current) transactions.push(current);
 
-        // Second token may also be a date (date valeur)
         let descStart = 1;
         if (texts[1] && texts[1].match(DD_MM)) descStart = 2;
 
-        // Find the amount among this row's items (rightmost valid number)
         const rowCopy = [...row];
         let debit = '', credit = '';
         for (let i = rowCopy.length - 1; i >= descStart; i--) {
@@ -586,13 +649,18 @@
         const desc = rowCopy.slice(descStart).map(it => it.text).join(' ').trim();
         const [, d, mo] = m0;
         current = { 'Date': `${d}/${mo}/${year}`, 'Description': desc, 'Débit': debit, 'Crédit': credit };
+      } else if (current && isContinuation(texts)) {
+        // Append exchange rate info to description
+        current['Description'] += ' — ' + texts.join(' ');
       }
-      // Continuation lines (multi-line descriptions / references) are intentionally skipped
-      // to keep the CSV clean. Only the first line of each transaction is kept.
     }
 
     if (current) transactions.push(current);
-    return { rows: transactions, columns: ['Date', 'Description', 'Débit', 'Crédit'] };
+    return {
+      rows: transactions,
+      columns: ['Date', 'Description', 'Débit', 'Crédit'],
+      meta: { bank: 'Crédit Agricole', openBalance, closeBalance, openDate, closeDate }
+    };
   }
 
   // ── Generic fallback parser ──────────────────────────────────────────────────
@@ -622,17 +690,61 @@
       result.push({ 'Date': dm[1], 'Description': desc, 'Montant': amount });
     }
 
-    return { rows: result, columns: ['Date', 'Description', 'Montant'] };
+    return {
+      rows: result,
+      columns: ['Date', 'Description', 'Montant'],
+      meta: { bank: null, openBalance: null, closeBalance: null, openDate: null, closeDate: null }
+    };
   }
 
-  // ── Render ───────────────────────────────────────────────────────────────────
-  function renderTable() {
-    tableHead.innerHTML = '<tr>' + columns.map(c => `<th>${escHtml(c)}</th>`).join('') + '</tr>';
+  // ── Summary bar ──────────────────────────────────────────────────────────────
+  function renderSummary() {
+    const { bank, openBalance, closeBalance, openDate, closeDate } = meta;
 
+    // Compute totals
+    const totalDebit  = parsedRows.reduce((s, r) => s + parseAmount(r['Débit']  || r['Montant'] || ''), 0);
+    const totalCredit = parsedRows.reduce((s, r) => s + parseAmount(r['Crédit'] || ''), 0);
+
+    const bankHtml = bank
+      ? `<span class="bank-badge">✓ ${escHtml(bank)} détecté</span>`
+      : `<span class="bank-badge generic">Format générique</span>`;
+
+    const balanceHtml = (openBalance && closeBalance) ? `
+      <div class="summary-sep"></div>
+      <div class="summary-item"><span class="summary-label">Solde ouverture (${openDate})</span><span class="summary-value">${escHtml(openBalance)} €</span></div>
+      <div class="summary-sep"></div>
+      <div class="summary-item"><span class="summary-label">Solde clôture (${closeDate})</span><span class="summary-value">${escHtml(closeBalance)} €</span></div>
+    ` : '';
+
+    const totalsHtml = (totalDebit || totalCredit) ? `
+      <div class="summary-sep"></div>
+      <div class="summary-item"><span class="summary-label">Total débits</span><span class="summary-value amount-neg">−${fmtAmt(totalDebit)} €</span></div>
+      <div class="summary-sep"></div>
+      <div class="summary-item"><span class="summary-label">Total crédits</span><span class="summary-value amount-pos">+${fmtAmt(totalCredit)} €</span></div>
+    ` : '';
+
+    summaryBar.innerHTML = bankHtml + balanceHtml + totalsHtml;
+    summaryBar.style.display = 'flex';
+  }
+
+  // ── Table render + sorting ───────────────────────────────────────────────────
+  function renderTable() {
+    // Header with sort icons
+    tableHead.innerHTML = '<tr>' + columns.map(col => {
+      const isSorted = sortState.col === col;
+      const cls = isSorted ? (sortState.dir === 1 ? 'sort-asc' : 'sort-desc') : '';
+      return `<th class="${cls}" data-col="${escHtml(col)}">${escHtml(col)}<i class="sort-icon"></i></th>`;
+    }).join('') + '</tr>';
+
+    tableHead.querySelectorAll('th').forEach(th => {
+      th.addEventListener('click', () => sortBy(th.dataset.col));
+    });
+
+    // Body
     tableBody.innerHTML = parsedRows.map((row, ri) =>
       '<tr>' + columns.map(col => {
         const val  = row[col] ?? '';
-        const colN = col.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+        const colN = normStr(col);
         let cls = '';
         if (colN === 'debit')   cls = val ? 'amount-neg' : '';
         else if (colN === 'credit') cls = val ? 'amount-pos' : '';
@@ -648,8 +760,38 @@
       td.addEventListener('input', () => { parsedRows[+td.dataset.row][td.dataset.col] = td.textContent; });
     });
 
+    // Footer totals row
+    const totalDebit  = parsedRows.reduce((s, r) => s + parseAmount(r['Débit']  || ''), 0);
+    const totalCredit = parsedRows.reduce((s, r) => s + parseAmount(r['Crédit'] || ''), 0);
+    const hasDC = columns.includes('Débit') && columns.includes('Crédit');
+
+    if (hasDC) {
+      tableFoot.innerHTML = '<tr>' + columns.map(col => {
+        if (col === 'Date') return `<td style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px">Total</td>`;
+        if (col === 'Débit')   return `<td class="amount-neg">${totalDebit  ? fmtAmt(totalDebit)  + ' €' : ''}</td>`;
+        if (col === 'Crédit')  return `<td class="amount-pos">${totalCredit ? fmtAmt(totalCredit) + ' €' : ''}</td>`;
+        return '<td></td>';
+      }).join('') + '</tr>';
+    } else {
+      tableFoot.innerHTML = '';
+    }
+
     const n = parsedRows.length;
     resultsMeta.textContent = `${n} transaction${n > 1 ? 's' : ''} détectée${n > 1 ? 's' : ''}`;
+  }
+
+  function sortBy(col) {
+    if (sortState.col === col) sortState.dir *= -1;
+    else { sortState.col = col; sortState.dir = 1; }
+
+    parsedRows.sort((a, b) => {
+      const va = a[col] ?? '', vb = b[col] ?? '';
+      const na = parseAmount(va), nb = parseAmount(vb);
+      if (!isNaN(na) && !isNaN(nb) && (na || nb)) return (na - nb) * sortState.dir;
+      return va.localeCompare(vb, 'fr') * sortState.dir;
+    });
+
+    renderTable();
   }
 
   // ── CSV Download ─────────────────────────────────────────────────────────────
@@ -668,6 +810,15 @@
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
+  function parseAmount(s) {
+    if (!s) return NaN;
+    return parseFloat(s.replace(/\s/g, '').replace(',', '.')) || NaN;
+  }
+
+  function fmtAmt(n) {
+    return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
   function showProgress(v)      { progressSec.style.display = v ? 'block' : 'none'; }
   function setProgress(p, lbl)  { progressBar.style.width = p + '%'; progressLbl.textContent = lbl; }
   function showResults()        { showProgress(false); resultsSec.style.display = 'block'; dropZone.style.display = 'none'; }
@@ -675,8 +826,11 @@
   function escHtml(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   function reset(showDrop = true) {
-    parsedRows = []; columns = [];
-    tableHead.innerHTML = ''; tableBody.innerHTML = ''; resultsMeta.textContent = '';
+    parsedRows = []; columns = []; sortState = { col: null, dir: 1 };
+    meta = { bank: null, openBalance: null, closeBalance: null, openDate: null, closeDate: null };
+    tableHead.innerHTML = ''; tableBody.innerHTML = ''; tableFoot.innerHTML = '';
+    summaryBar.style.display = 'none'; summaryBar.innerHTML = '';
+    resultsMeta.textContent = '';
     resultsSec.style.display = 'none'; errorBox.style.display = 'none';
     showProgress(false); progressBar.style.width = '0%';
     if (showDrop) { dropZone.style.display = 'block'; fileInput.value = ''; }
