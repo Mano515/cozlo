@@ -370,10 +370,10 @@
 <header>
   <div class="logo">Coz<span>lo</span></div>
   <div class="tagline">PDF bancaire → CSV</div>
-  <a id="btn-header-buy" href="https://manuel515.gumroad.com/l/cozlo" target="_blank" rel="noopener"
-     style="margin-left:auto;background:var(--accent);color:#fff;font-size:13px;font-weight:600;padding:7px 16px;border-radius:8px;text-decoration:none;transition:opacity 0.15s">
-    Acheter — 15 €
-  </a>
+  <button id="btn-header-buy"
+     style="margin-left:auto;background:var(--accent);color:#fff;font-size:13px;font-weight:600;padding:7px 16px;border-radius:8px;border:none;cursor:pointer;transition:opacity 0.15s">
+    Acheter une licence
+  </button>
   <button id="btn-manage-license" title="Gérer la licence"
           style="margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;padding:4px 8px;border-radius:6px;display:none">
     🔑 Licence
@@ -540,6 +540,7 @@
   });
 
   const btnHeaderBuy = document.getElementById('btn-header-buy');
+  btnHeaderBuy.addEventListener('click', () => openLicenseModal());
 
   function updateHeaderButtons() {
     if (isLicensed()) {
