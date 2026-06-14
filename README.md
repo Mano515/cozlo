@@ -1,6 +1,6 @@
 # Cozlo
 
-Convertisseur de relevés bancaires PDF vers CSV, entièrement dans le navigateur.
+Convertisseur de relevés bancaires PDF en CSV, entièrement dans le navigateur.
 
 Aucune donnée ne quitte votre appareil — le traitement est 100% local, sans serveur, sans compte.
 
@@ -35,33 +35,31 @@ Aucune donnée ne quitte votre appareil — le traitement est 100% local, sans s
 | Banque | Statut |
 |---|---|
 | Crédit Agricole | ✅ Testé |
+| BNP Paribas | 🔄 Parser intégré (non testé sur relevé réel) |
+| Société Générale | 🔄 Parser intégré (non testé sur relevé réel) |
+| Caisse d'Épargne | 🔄 Parser intégré (non testé sur relevé réel) |
+| La Banque Postale | 🔄 Parser intégré (non testé sur relevé réel) |
+| Crédit Mutuel | 🔄 Parser intégré (non testé sur relevé réel) |
+| LCL | 🔄 Parser intégré (non testé sur relevé réel) |
 | Autres | 🔄 Parser générique (résultats variables) |
 
-D'autres banques seront ajoutées. Si votre format n'est pas reconnu, ouvrez une issue avec un exemple anonymisé.
+D'autres banques seront ajoutées. Si votre format n'est pas reconnu, [contactez-nous](mailto:hmanuel515@hotmail.fr) avec un exemple anonymisé.
 
 ---
 
-## Utilisation
+## Tarif
 
-Pas d'installation. Ouvrez simplement `index.html` dans un navigateur, ou utilisez la version hébergée :
+**15 € — accès à vie, paiement unique.**
 
-```
-https://mano515.github.io/cozlo/
-```
+La conversion est gratuite et illimitée. Le téléchargement CSV nécessite une licence.
 
-Pour lancer localement :
-
-```bash
-git clone https://github.com/Mano515/cozlo.git
-cd cozlo
-# Ouvrir index.html dans votre navigateur
-```
+[→ Acheter sur Gumroad](https://manuel515.gumroad.com/l/cozlo)
 
 ---
 
-## Vie privée
+## Vie privée & conformité
 
-Cozlo n'envoie aucune donnée à un serveur. Tout le traitement se passe dans votre navigateur via [PDF.js](https://mozilla.github.io/pdf.js/) (Mozilla). Le fichier PDF ne quitte jamais votre appareil.
+Cozlo n'envoie aucune donnée à un serveur. Tout le traitement se passe dans votre navigateur via [PDF.js](https://mozilla.github.io/pdf.js/) (Mozilla). Le fichier PDF ne quitte jamais votre appareil. Conforme RGPD par design.
 
 ---
 
@@ -69,9 +67,10 @@ Cozlo n'envoie aucune donnée à un serveur. Tout le traitement se passe dans vo
 
 - HTML / CSS / JS vanilla — aucun framework, aucun build tool
 - [PDF.js 3.11](https://mozilla.github.io/pdf.js/) via CDN pour l'extraction du texte
+- [Gumroad](https://gumroad.com) pour la gestion des licences
 
 ---
 
-## Licence
+## Contact
 
-MIT
+Un bug ? Une banque non supportée ? → [hmanuel515@hotmail.fr](mailto:hmanuel515@hotmail.fr)
