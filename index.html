@@ -604,16 +604,38 @@
   let parsedRows = [], columns = [], sortState = { col: null, dir: 1 };
   let meta = { bank: null, openBalance: null, closeBalance: null, openDate: null, closeDate: null };
 
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); dropZone.setAttribute('aria-grabbed', 'true'); });
-  dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('drag-over'); dropZone.removeAttribute('aria-grabbed'); });
+  // Drag counter to handle dragleave on child elements
+  let dragCount = 0;
+
+  dropZone.addEventListener('dragenter', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCount++;
+    dropZone.classList.add('drag-over');
+  });
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  dropZone.addEventListener('dragleave', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCount--;
+    if (dragCount === 0) dropZone.classList.remove('drag-over');
+  });
   dropZone.addEventListener('drop', e => {
     e.preventDefault();
+    e.stopPropagation();
+    dragCount = 0;
     dropZone.classList.remove('drag-over');
     const f = e.dataTransfer.files[0];
-    if (f && f.type === 'application/pdf') processFile(f, false);
+    const isPdf = f && (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+    if (isPdf) processFile(f, false);
     else showError('Veuillez déposer un fichier PDF.');
   });
-  // Click and keyboard activation for drop zone
+
+  // Click and keyboard activation
   dropZone.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
