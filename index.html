@@ -370,6 +370,10 @@
 <header>
   <div class="logo">Coz<span>lo</span></div>
   <div class="tagline">PDF bancaire → CSV</div>
+  <a id="btn-header-buy" href="https://manuel515.gumroad.com/l/cozlo" target="_blank" rel="noopener"
+     style="margin-left:auto;background:var(--accent);color:#fff;font-size:13px;font-weight:600;padding:7px 16px;border-radius:8px;text-decoration:none;transition:opacity 0.15s">
+    Acheter — 15 €
+  </a>
   <button id="btn-manage-license" title="Gérer la licence"
           style="margin-left:auto;background:none;border:none;color:var(--text-muted);font-size:12px;cursor:pointer;padding:4px 8px;border-radius:6px;display:none">
     🔑 Licence
@@ -481,7 +485,7 @@
 
   function onLicenseActivated() {
     closeLicenseModal();
-    btnManage.style.display = 'block';
+    updateHeaderButtons();
     showToast('Licence activée — téléchargement débloqué !');
   }
 
@@ -530,13 +534,24 @@
   btnManage.addEventListener('click', () => {
     if (confirm('Supprimer la licence enregistrée ?')) {
       localStorage.removeItem(LICENSE_STORAGE);
-      btnManage.style.display = 'none';
+      updateHeaderButtons();
       showToast('Licence supprimée.');
     }
   });
 
-  // Show manage button if already licensed
-  if (isLicensed()) btnManage.style.display = 'block';
+  const btnHeaderBuy = document.getElementById('btn-header-buy');
+
+  function updateHeaderButtons() {
+    if (isLicensed()) {
+      btnHeaderBuy.style.display = 'none';
+      btnManage.style.display = 'block';
+    } else {
+      btnHeaderBuy.style.display = 'block';
+      btnManage.style.display = 'none';
+    }
+  }
+
+  updateHeaderButtons();
 
   // Handle ?key= param from Gumroad post-purchase redirect
   const urlKey = new URLSearchParams(location.search).get('key');
