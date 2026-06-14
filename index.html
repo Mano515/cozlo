@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cozlo — PDF bancaire vers CSV</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f11;
+      --surface: #1a1a1f;
+      --surface2: #24242b;
+      --border: #2e2e38;
+      --accent: #6c63ff;
+      --accent-light: #8f88ff;
+      --text: #e8e8f0;
+      --text-muted: #7a7a90;
+      --green: #4ade80;
+      --red: #f87171;
+      --radius: 12px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      padding: 24px 40px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: var(--text);
+    }
+
+    .logo span { color: var(--accent-light); }
+
+    .tagline {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-left: 4px;
+    }
+
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 24px;
+      gap: 32px;
+    }
+
+    .hero {
+      text-align: center;
+      max-width: 520px;
+    }
+
+    .hero h1 {
+      font-size: 36px;
+      font-weight: 700;
+      letter-spacing: -1px;
+      line-height: 1.15;
+      margin-bottom: 14px;
+    }
+
+    .hero h1 span { color: var(--accent-light); }
+
+    .hero p {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #1e1e2a;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 20px;
+    }
+
+    .badge .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+    }
+
+    /* Drop zone */
+    .drop-zone {
+      width: 100%;
+      max-width: 560px;
+      border: 2px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 48px 32px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      position: relative;
+      background: var(--surface);
+    }
+
+    .drop-zone:hover, .drop-zone.drag-over {
+      border-color: var(--accent);
+      background: #1e1b36;
+    }
+
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+
+    .drop-icon {
+      font-size: 40px;
+      margin-bottom: 12px;
+    }
+
+    .drop-zone h2 {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .drop-zone p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .drop-zone .formats {
+      margin-top: 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+      background: var(--surface2);
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+
+    /* Progress */
+    #progress-section {
+      width: 100%;
+      max-width: 560px;
+      display: none;
+    }
+
+    .progress-bar-wrap {
+      background: var(--surface2);
+      border-radius: 6px;
+      height: 6px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-light));
+      border-radius: 6px;
+      width: 0%;
+      transition: width 0.3s;
+    }
+
+    .progress-label {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* Results */
+    #results-section {
+      width: 100%;
+      max-width: 760px;
+      display: none;
+    }
+
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .results-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .results-meta {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover { opacity: 0.88; }
+
+    .btn-ghost {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover { background: var(--border); }
+
+    .btn-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    /* Table */
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead {
+      background: var(--surface2);
+    }
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 11px 16px;
+      border-top: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    tr:hover td { background: var(--surface2); }
+
+    .amount-pos { color: var(--green); }
+    .amount-neg { color: var(--red); }
+
+    /* Editable cell */
+    td[contenteditable="true"]:focus {
+      outline: 1px solid var(--accent);
+      border-radius: 4px;
+    }
+
+    /* Error */
+    #error-box {
+      display: none;
+      background: #2a1a1a;
+      border: 1px solid #5a2020;
+      color: var(--red);
+      padding: 14px 18px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      max-width: 560px;
+      width: 100%;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+    }
+
+    /* Separator input */
+    .options-row {
+      width: 100%;
+      max-width: 560px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .option-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .option-group select, .option-group input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 6px 10px;
+      font-size: 13px;
+      outline: none;
+    }
+
+    .option-group select:focus, .option-group input:focus {
+      border-color: var(--accent);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Coz<span>lo</span></div>
+  <div class="tagline">PDF bancaire → CSV</div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="badge"><span class="dot"></span> 100% local — aucune donnée envoyée</div>
+    <h1>Convertissez vos <span>relevés bancaires</span> en CSV</h1>
+    <p>Glissez votre PDF directement dans le navigateur. La conversion se fait localement, sans serveur.</p>
+  </div>
+
+  <!-- Options -->
+  <div class="options-row">
+    <div class="option-group">
+      <label for="sep">Séparateur CSV</label>
+      <select id="sep">
+        <option value=";">; (point-virgule)</option>
+        <option value=",">, (virgule)</option>
+        <option value="&#9;">⇥ (tabulation)</option>
+      </select>
+    </div>
+    <div class="option-group">
+      <label for="date-col">Colonne date</label>
+      <input id="date-col" type="text" value="Date" placeholder="Date" style="width:90px"/>
+    </div>
+    <div class="option-group">
+      <label for="amount-col">Colonne montant</label>
+      <input id="amount-col" type="text" value="Montant" placeholder="Montant" style="width:110px"/>
+    </div>
+  </div>
+
+  <!-- Drop zone -->
+  <div class="drop-zone" id="drop-zone">
+    <input type="file" id="file-input" accept=".pdf" />
+    <div class="drop-icon">📄</div>
+    <h2>Glissez votre relevé PDF ici</h2>
+    <p>ou cliquez pour sélectionner un fichier</p>
+    <div class="formats">PDF uniquement — traitement 100% navigateur</div>
+  </div>
+
+  <!-- Progress -->
+  <div id="progress-section">
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="progress-label" id="progress-label">Extraction en cours…</div>
+  </div>
+
+  <!-- Error -->
+  <div id="error-box"></div>
+
+  <!-- Results -->
+  <div id="results-section">
+    <div class="results-header">
+      <div>
+        <h2>Transactions détectées</h2>
+        <div class="results-meta" id="results-meta"></div>
+      </div>
+      <div class="btn-actions">
+        <button class="btn btn-ghost" id="btn-reset">↩ Nouveau fichier</button>
+        <button class="btn btn-primary" id="btn-download">⬇ Télécharger CSV</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="results-table">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<footer>
+  Cozlo — aucune donnée ne quitte votre navigateur &nbsp;·&nbsp; 2025
+</footer>
+
+<script>
+  // PDF.js worker
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  const dropZone   = document.getElementById('drop-zone');
+  const fileInput  = document.getElementById('file-input');
+  const progressSec = document.getElementById('progress-section');
+  const progressBar = document.getElementById('progress-bar');
+  const progressLbl = document.getElementById('progress-label');
+  const resultsSec = document.getElementById('results-section');
+  const errorBox   = document.getElementById('error-box');
+  const tableHead  = document.getElementById('table-head');
+  const tableBody  = document.getElementById('table-body');
+  const resultsMeta = document.getElementById('results-meta');
+
+  let parsedRows = [];
+  let columns    = [];
+
+  // --- Drag & Drop ---
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') processFile(file);
+    else showError('Veuillez déposer un fichier PDF.');
+  });
+  fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) processFile(e.target.files[0]);
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', reset);
+  document.getElementById('btn-download').addEventListener('click', downloadCSV);
+
+  // --- Process ---
+  async function processFile(file) {
+    reset(false);
+    setProgress(0, `Chargement de "${file.name}"…`);
+    showProgress(true);
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const totalPages = pdf.numPages;
+
+      let allLines = [];
+
+      for (let i = 1; i <= totalPages; i++) {
+        setProgress(Math.round((i / totalPages) * 80), `Page ${i} / ${totalPages}…`);
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const lines = groupIntoLines(content.items);
+        allLines = allLines.concat(lines);
+      }
+
+      setProgress(90, 'Analyse des transactions…');
+      const result = parseTransactions(allLines);
+      parsedRows = result.rows;
+      columns    = result.columns;
+
+      if (parsedRows.length === 0) {
+        showError('Aucune transaction détectée. Le format de ce relevé n\'est peut-être pas encore pris en charge. Vous pouvez modifier les cellules du tableau manuellement si certaines lignes ont été extraites.');
+        return;
+      }
+
+      setProgress(100, 'Terminé !');
+      renderTable();
+      showResults();
+    } catch (err) {
+      showError('Erreur lors de la lecture du PDF : ' + err.message);
+    }
+  }
+
+  // Group PDF text items into lines by Y position
+  function groupIntoLines(items) {
+    const lineMap = {};
+    for (const item of items) {
+      const y = Math.round(item.transform[5]);
+      if (!lineMap[y]) lineMap[y] = [];
+      lineMap[y].push({ x: item.transform[4], text: item.str });
+    }
+    return Object.entries(lineMap)
+      .sort((a, b) => Number(b[0]) - Number(a[0]))
+      .map(([, cells]) => {
+        cells.sort((a, b) => a.x - b.x);
+        return cells.map(c => c.text.trim()).filter(Boolean).join(' | ');
+      })
+      .filter(l => l.length > 0);
+  }
+
+  // Heuristic parser: detect date, description, amount patterns
+  function parseTransactions(lines) {
+    const dateLabel  = document.getElementById('date-col').value || 'Date';
+    const amountLabel = document.getElementById('amount-col').value || 'Montant';
+
+    // Patterns for dates (DD/MM/YYYY, DD-MM-YYYY, DD.MM.YYYY, YYYY-MM-DD)
+    const dateRe = /\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}|\d{4}[\/\-\.]\d{2}[\/\-\.]\d{2})\b/;
+    // Amount: optional sign, digits, optional decimal
+    const amountRe = /([+\-]?\s?\d{1,3}(?:[\s.]\d{3})*(?:[,\.]\d{1,2})?)\s*([€$£])?/;
+
+    const rows = [];
+
+    for (const line of lines) {
+      const dateMatch = line.match(dateRe);
+      if (!dateMatch) continue;
+
+      const date = dateMatch[1];
+      let rest = line;
+
+      // Try to extract amount (look for last numeric-looking token)
+      const parts = line.split(' | ');
+      let amount = '';
+      let description = '';
+
+      // Scan from right for a numeric part that looks like a money amount
+      for (let i = parts.length - 1; i >= 0; i--) {
+        const clean = parts[i].replace(/\s/g, '');
+        if (/^[+\-]?\d{1,3}([.,]\d{3})*([.,]\d{1,2})?[€$£]?$/.test(clean) ||
+            /^[€$£]?[+\-]?\d{1,3}([.,]\d{3})*([.,]\d{1,2})?$/.test(clean)) {
+          amount = parts[i];
+          parts.splice(i, 1);
+          break;
+        }
+      }
+
+      // Remaining parts minus the date become description
+      description = parts
+        .join(' ')
+        .replace(dateMatch[0], '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+      rows.push({ [dateLabel]: date, 'Description': description, [amountLabel]: amount });
+    }
+
+    const cols = rows.length > 0 ? Object.keys(rows[0]) : [dateLabel, 'Description', amountLabel];
+    return { rows, columns: cols };
+  }
+
+  function renderTable() {
+    // Header
+    tableHead.innerHTML = '<tr>' + columns.map(c => `<th>${c}</th>`).join('') + '</tr>';
+
+    // Body
+    const amountLabel = document.getElementById('amount-col').value || 'Montant';
+    tableBody.innerHTML = parsedRows.map((row, ri) =>
+      '<tr>' + columns.map(col => {
+        const val = row[col] ?? '';
+        let cls = '';
+        if (col === amountLabel) {
+          const num = parseFloat(val.replace(/[^\d,.\-+]/g, '').replace(',', '.'));
+          if (!isNaN(num)) cls = num >= 0 ? 'amount-pos' : 'amount-neg';
+        }
+        return `<td contenteditable="true" class="${cls}" data-row="${ri}" data-col="${col}">${escHtml(val)}</td>`;
+      }).join('') + '</tr>'
+    ).join('');
+
+    // Sync edits back to parsedRows
+    tableBody.querySelectorAll('td[contenteditable]').forEach(td => {
+      td.addEventListener('input', () => {
+        parsedRows[+td.dataset.row][td.dataset.col] = td.textContent;
+      });
+    });
+
+    resultsMeta.textContent = `${parsedRows.length} transaction${parsedRows.length > 1 ? 's' : ''} détectée${parsedRows.length > 1 ? 's' : ''}`;
+  }
+
+  function downloadCSV() {
+    const sep = document.getElementById('sep').value;
+    const header = columns.join(sep);
+    const body = parsedRows.map(row =>
+      columns.map(col => `"${(row[col] ?? '').replace(/"/g, '""')}"`).join(sep)
+    ).join('\n');
+    const csv = header + '\n' + body;
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'releve_' + new Date().toISOString().slice(0,10) + '.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function showProgress(visible) {
+    progressSec.style.display = visible ? 'block' : 'none';
+  }
+
+  function setProgress(pct, label) {
+    progressBar.style.width = pct + '%';
+    progressLbl.textContent = label;
+  }
+
+  function showResults() {
+    showProgress(false);
+    resultsSec.style.display = 'block';
+    dropZone.style.display = 'none';
+  }
+
+  function showError(msg) {
+    showProgress(false);
+    errorBox.style.display = 'block';
+    errorBox.textContent = '⚠ ' + msg;
+  }
+
+  function reset(showDrop = true) {
+    parsedRows = [];
+    columns = [];
+    tableHead.innerHTML = '';
+    tableBody.innerHTML = '';
+    resultsMeta.textContent = '';
+    resultsSec.style.display = 'none';
+    errorBox.style.display = 'none';
+    showProgress(false);
+    progressBar.style.width = '0%';
+    if (showDrop) {
+      dropZone.style.display = 'block';
+      fileInput.value = '';
+    }
+  }
+
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+</script>
+</body>
+</html>
