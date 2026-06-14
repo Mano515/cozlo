@@ -515,8 +515,9 @@
         const vp = page.getViewport({ scale: 1 });
         const content = await page.getTextContent();
         for (const item of content.items) {
-          if (!item.str.trim()) continue;
-          allItems.push({ x: item.transform[4], y: vp.height - item.transform[5], text: item.str.trim(), page: p });
+          const t = item.str.replace(/[¨©®°¤]/g, '').trim(); // strip PDF encoding artifacts
+          if (!t) continue;
+          allItems.push({ x: item.transform[4], y: vp.height - item.transform[5], text: t, page: p });
         }
       }
 
@@ -553,14 +554,17 @@
     return parseGeneric(items);
   }
 
-  // ── Group items by Y position (within tolerance) ─────────────────────────────
-  function groupByY(items, tol = 3) {
-    const sorted = [...items].sort((a, b) => a.y - b.y || a.x - b.x);
+  // ── Group items by (page, Y) position — MUST include page to avoid cross-page merges ──
+  function groupByY(items, tol = 2) {
+    const sorted = [...items].sort((a, b) => a.page - b.page || a.y - b.y || a.x - b.x);
     const groups = [];
     for (const item of sorted) {
       const last = groups[groups.length - 1];
-      if (last && Math.abs(last[0].y - item.y) <= tol) last.push(item);
-      else groups.push([item]);
+      if (last && last[0].page === item.page && Math.abs(last[0].y - item.y) <= tol) {
+        last.push(item);
+      } else {
+        groups.push([item]);
+      }
     }
     return groups;
   }
