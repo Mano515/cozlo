@@ -126,7 +126,7 @@
       position: absolute;
       inset: 0;
       opacity: 0;
-      cursor: pointer;
+      pointer-events: none; /* drop zone div handles all mouse/drag events */
       width: 100%;
       height: 100%;
     }
@@ -624,7 +624,8 @@
     if (f && f.type === 'application/pdf') processFile(f, false);
     else showError('Veuillez déposer un fichier PDF.');
   });
-  // Keyboard activation for drop zone (Enter / Space)
+  // Click and keyboard activation for drop zone
+  dropZone.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
   });
