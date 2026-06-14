@@ -613,33 +613,11 @@
   // Drag counter to handle dragleave on child elements
   let dragCount = 0;
 
-  dropZone.addEventListener('dragenter', e => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCount++;
-    dropZone.classList.add('drag-over');
-  });
-  dropZone.addEventListener('dragover', e => {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'copy';
-  });
-  dropZone.addEventListener('dragleave', e => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCount--;
-    if (dragCount === 0) dropZone.classList.remove('drag-over');
-  });
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    e.stopPropagation();
-    dragCount = 0;
-    dropZone.classList.remove('drag-over');
-    const f = e.dataTransfer.files[0];
-    const isPdf = f && (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
-    if (isPdf) processFile(f, false);
-    else showError('Veuillez déposer un fichier PDF.');
-  });
+  // Visual drag feedback only — the native file input handles the actual drop
+  dropZone.addEventListener('dragenter', e => { e.preventDefault(); dragCount++; dropZone.classList.add('drag-over'); });
+  dropZone.addEventListener('dragover',  e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+  dropZone.addEventListener('dragleave', () => { dragCount--; if (dragCount === 0) dropZone.classList.remove('drag-over'); });
+  dropZone.addEventListener('drop',      () => { dragCount = 0; dropZone.classList.remove('drag-over'); });
 
   // Click and keyboard activation
   dropZone.addEventListener('click', () => fileInput.click());
