@@ -122,7 +122,14 @@
       background: #1e1b36;
     }
 
-    /* file input is hidden via display:none in HTML, not overlaid */
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
 
     .drop-icon {
       font-size: 40px;
@@ -510,15 +517,14 @@
   </div>
 
   <!-- Drop zone -->
-  <input type="file" id="file-input" accept=".pdf" aria-label="Sélectionner un relevé bancaire PDF" style="display:none" />
-
   <div
     class="drop-zone"
     id="drop-zone"
     role="button"
     tabindex="0"
-    aria-label="Zone de dépôt de fichier PDF. Appuyez sur Entrée ou Espace pour ouvrir le sélecteur de fichier."
+    aria-label="Zone de dépôt de fichier PDF. Cliquez ou appuyez sur Entrée pour ouvrir le sélecteur."
   >
+    <input type="file" id="file-input" accept=".pdf" aria-hidden="true" tabindex="-1" />
     <div class="drop-icon" aria-hidden="true">📄</div>
     <p class="drop-title">Glissez votre relevé PDF ici</p>
     <p>ou cliquez pour sélectionner un fichier</p>
