@@ -498,12 +498,10 @@
         body: `product_id=${GUMROAD_PRODUCT}&license_key=${encodeURIComponent(key.trim())}&increment_uses_count=false`,
       });
       const data = await res.json();
-      console.log('Gumroad response:', data);
       if (data.success === true) return true;
       keyError.textContent = data.message || 'Clé invalide.';
       return false;
-    } catch (e) {
-      console.error('Gumroad error:', e);
+    } catch {
       keyError.textContent = 'Erreur réseau — réessayez.';
       return false;
     }
