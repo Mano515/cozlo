@@ -136,7 +136,14 @@
       margin-bottom: 12px;
     }
 
-    .drop-zone h2 {
+    /* Screen-reader only utility */
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+    }
+
+    .drop-zone .drop-title {
       font-size: 17px;
       font-weight: 600;
       margin-bottom: 6px;
@@ -417,71 +424,160 @@
     .option-group select:focus, .option-group input:focus {
       border-color: var(--accent);
     }
+
+    /* ── Focus visible (keyboard nav) ───────────────────────────────────────── */
+    :focus-visible {
+      outline: 2px solid var(--accent-light);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+
+    .btn:focus-visible       { outline-offset: 2px; }
+    .drop-zone:focus-visible { outline-offset: -2px; border-color: var(--accent); }
+    th:focus-visible         { outline-offset: -2px; }
+
+    /* Minimum touch target 44px */
+    .btn { min-height: 44px; min-width: 44px; }
+    th   { min-height: 44px; }
+
+    /* ── Reduced motion ─────────────────────────────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; }
+      .progress-bar { transition: none; }
+    }
+
+    /* ── Responsive — tablet ────────────────────────────────────────────────── */
+    @media (max-width: 700px) {
+      header { padding: 16px 20px; }
+
+      main { padding: 32px 16px; gap: 24px; }
+
+      .hero h1 { font-size: 26px; letter-spacing: -0.5px; }
+      .hero p  { font-size: 14px; }
+
+      .drop-zone { padding: 32px 20px; }
+
+      .results-header { flex-direction: column; align-items: flex-start; }
+      .btn-actions    { width: 100%; }
+      .btn-actions .btn { flex: 1; justify-content: center; min-width: 0; }
+
+      .summary-bar { gap: 12px; }
+      .summary-sep { display: none; }
+
+      #results-section { max-width: 100%; }
+
+      .table-wrap { border-radius: 8px; }
+      td, th { padding: 10px 12px; font-size: 12px; }
+
+      tfoot td { font-size: 12px; }
+    }
+
+    /* ── Responsive — mobile ────────────────────────────────────────────────── */
+    @media (max-width: 420px) {
+      .hero h1 { font-size: 22px; }
+
+      .btn-actions { flex-direction: column; }
+      .btn-actions .btn { width: 100%; }
+
+      .options-row { flex-direction: column; align-items: flex-start; }
+    }
+
+    /* Scroll hint on table */
+    .table-wrap { -webkit-overflow-scrolling: touch; }
   </style>
 </head>
 <body>
 
-<header>
-  <div class="logo">Coz<span>lo</span></div>
-  <div class="tagline">PDF bancaire → CSV</div>
+<header role="banner">
+  <div class="logo" aria-label="Cozlo">Coz<span aria-hidden="true">lo</span></div>
+  <div class="tagline" aria-hidden="true">PDF bancaire → CSV</div>
 </header>
 
-<main>
+<main id="main-content">
   <div class="hero">
-    <div class="badge"><span class="dot"></span> 100% local — aucune donnée envoyée</div>
+    <div class="badge" aria-label="Traitement 100% local, aucune donnée envoyée">
+      <span class="dot" aria-hidden="true"></span>
+      100% local — aucune donnée envoyée
+    </div>
     <h1>Convertissez vos <span>relevés bancaires</span> en CSV</h1>
     <p>Glissez votre PDF directement dans le navigateur. La conversion se fait localement, sans serveur.</p>
   </div>
 
   <!-- Options -->
-  <div class="options-row">
+  <div class="options-row" role="group" aria-label="Options d'export">
     <div class="option-group">
       <label for="sep">Séparateur CSV</label>
-      <select id="sep">
+      <select id="sep" aria-describedby="sep-hint">
         <option value=";">; (point-virgule)</option>
         <option value=",">, (virgule)</option>
         <option value="&#9;">⇥ (tabulation)</option>
       </select>
+      <span id="sep-hint" class="sr-only">Choisissez le séparateur utilisé dans le fichier CSV exporté</span>
     </div>
   </div>
 
   <!-- Drop zone -->
-  <div class="drop-zone" id="drop-zone">
-    <input type="file" id="file-input" accept=".pdf" />
-    <div class="drop-icon">📄</div>
-    <h2>Glissez votre relevé PDF ici</h2>
+  <div
+    class="drop-zone"
+    id="drop-zone"
+    role="button"
+    tabindex="0"
+    aria-label="Zone de dépôt de fichier PDF. Appuyez sur Entrée ou Espace pour ouvrir le sélecteur de fichier."
+  >
+    <input
+      type="file"
+      id="file-input"
+      accept=".pdf"
+      aria-label="Sélectionner un relevé bancaire PDF"
+    />
+    <div class="drop-icon" aria-hidden="true">📄</div>
+    <p class="drop-title">Glissez votre relevé PDF ici</p>
     <p>ou cliquez pour sélectionner un fichier</p>
-    <div class="formats">PDF uniquement — traitement 100% navigateur</div>
+    <div class="formats" aria-hidden="true">PDF uniquement — traitement 100% navigateur</div>
   </div>
 
   <!-- Progress -->
-  <div id="progress-section">
+  <div
+    id="progress-section"
+    role="status"
+    aria-live="polite"
+    aria-atomic="true"
+    aria-label="Progression de l'extraction"
+  >
     <div class="progress-bar-wrap">
-      <div class="progress-bar" id="progress-bar"></div>
+      <div
+        class="progress-bar"
+        id="progress-bar"
+        role="progressbar"
+        aria-valuenow="0"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-label="Progression"
+      ></div>
     </div>
     <div class="progress-label" id="progress-label">Extraction en cours…</div>
   </div>
 
   <!-- Error -->
-  <div id="error-box"></div>
+  <div id="error-box" role="alert" aria-live="assertive"></div>
 
   <!-- Results -->
-  <div id="results-section">
+  <div id="results-section" aria-label="Résultats de la conversion">
     <div class="results-header">
       <div>
-        <h2>Transactions détectées</h2>
-        <div class="results-meta" id="results-meta"></div>
+        <h2 id="results-title">Transactions détectées</h2>
+        <div class="results-meta" id="results-meta" aria-live="polite"></div>
       </div>
-      <div class="btn-actions">
-        <button class="btn btn-ghost" id="btn-reset">↩ Nouveau fichier</button>
-        <button class="btn btn-ghost" id="btn-add">+ Ajouter un relevé</button>
-        <input type="file" id="file-add" accept=".pdf" style="display:none" />
-        <button class="btn btn-primary" id="btn-download">⬇ Télécharger CSV</button>
+      <div class="btn-actions" role="group" aria-label="Actions sur les résultats">
+        <button type="button" class="btn btn-ghost" id="btn-reset" aria-label="Recommencer avec un nouveau fichier">↩ Nouveau fichier</button>
+        <button type="button" class="btn btn-ghost" id="btn-add" aria-label="Ajouter un autre relevé PDF aux résultats">+ Ajouter un relevé</button>
+        <input type="file" id="file-add" accept=".pdf" aria-label="Sélectionner un relevé supplémentaire" style="display:none" />
+        <button type="button" class="btn btn-primary" id="btn-download" aria-label="Télécharger le fichier CSV">⬇ Télécharger CSV</button>
       </div>
     </div>
-    <div id="summary-bar" class="summary-bar" style="display:none"></div>
-    <div class="table-wrap" style="margin-top:16px">
-      <table id="results-table">
+    <div id="summary-bar" class="summary-bar" aria-label="Résumé financier" style="display:none"></div>
+    <div class="table-wrap" style="margin-top:16px" role="region" aria-label="Tableau des transactions" tabindex="0">
+      <table id="results-table" aria-labelledby="results-title">
         <thead id="table-head"></thead>
         <tbody id="table-body"></tbody>
         <tfoot id="table-foot"></tfoot>
@@ -490,10 +586,10 @@
   </div>
 </main>
 
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
-<footer>
-  Cozlo — aucune donnée ne quitte votre navigateur &nbsp;·&nbsp; 2025
+<footer role="contentinfo">
+  <p>Cozlo — aucune donnée ne quitte votre navigateur &nbsp;·&nbsp; 2025</p>
 </footer>
 
 <script>
@@ -519,14 +615,18 @@
   let parsedRows = [], columns = [], sortState = { col: null, dir: 1 };
   let meta = { bank: null, openBalance: null, closeBalance: null, openDate: null, closeDate: null };
 
-  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); dropZone.setAttribute('aria-grabbed', 'true'); });
+  dropZone.addEventListener('dragleave', () => { dropZone.classList.remove('drag-over'); dropZone.removeAttribute('aria-grabbed'); });
   dropZone.addEventListener('drop', e => {
     e.preventDefault();
     dropZone.classList.remove('drag-over');
     const f = e.dataTransfer.files[0];
     if (f && f.type === 'application/pdf') processFile(f, false);
     else showError('Veuillez déposer un fichier PDF.');
+  });
+  // Keyboard activation for drop zone (Enter / Space)
+  dropZone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
   });
   fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0], false); });
   fileAdd.addEventListener('change',  e => { if (e.target.files[0]) processFile(e.target.files[0], true);  fileAdd.value = ''; });
@@ -827,11 +927,13 @@
     tableHead.innerHTML = '<tr>' + columns.map(col => {
       const isSorted = sortState.col === col;
       const cls = isSorted ? (sortState.dir === 1 ? 'sort-asc' : 'sort-desc') : '';
-      return `<th class="${cls}" data-col="${escHtml(col)}">${escHtml(col)}<i class="sort-icon"></i></th>`;
+      const ariaSort = isSorted ? (sortState.dir === 1 ? 'ascending' : 'descending') : 'none';
+      return `<th class="${cls}" data-col="${escHtml(col)}" role="columnheader" scope="col" aria-sort="${ariaSort}" tabindex="0">${escHtml(col)}<i class="sort-icon" aria-hidden="true"></i></th>`;
     }).join('') + '</tr>';
 
     tableHead.querySelectorAll('th').forEach(th => {
       th.addEventListener('click', () => sortBy(th.dataset.col));
+      th.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sortBy(th.dataset.col); } });
     });
 
     const TYPE_CSS = {
@@ -929,7 +1031,7 @@
   }
 
   function showProgress(v)      { progressSec.style.display = v ? 'block' : 'none'; }
-  function setProgress(p, lbl)  { progressBar.style.width = p + '%'; progressLbl.textContent = lbl; }
+  function setProgress(p, lbl)  { progressBar.style.width = p + '%'; progressBar.setAttribute('aria-valuenow', p); progressLbl.textContent = lbl; }
   function showResults()        { showProgress(false); resultsSec.style.display = 'block'; dropZone.style.display = 'none'; }
   function showError(msg)       { showProgress(false); errorBox.style.display = 'block'; errorBox.textContent = '⚠ ' + msg; }
   function escHtml(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
