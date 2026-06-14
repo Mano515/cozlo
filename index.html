@@ -9,17 +9,17 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0f0f11;
-      --surface: #1a1a1f;
-      --surface2: #24242b;
-      --border: #2e2e38;
-      --accent: #6c63ff;
+      --bg:           #0f0f11;
+      --surface:      #1a1a1f;
+      --surface2:     #24242b;
+      --border:       #2e2e38;
+      --accent:       #6c63ff;
       --accent-light: #8f88ff;
-      --text: #e8e8f0;
-      --text-muted: #7a7a90;
-      --green: #4ade80;
-      --red: #f87171;
-      --radius: 12px;
+      --text:         #e8e8f0;
+      --text-muted:   #7a7a90;
+      --green:        #4ade80;
+      --red:          #f87171;
+      --radius:       12px;
     }
 
     body {
@@ -31,6 +31,7 @@
       flex-direction: column;
     }
 
+    /* ── Header ─────────────────────────────────────────────────────────────── */
     header {
       padding: 24px 40px;
       display: flex;
@@ -38,22 +39,11 @@
       gap: 12px;
       border-bottom: 1px solid var(--border);
     }
-
-    .logo {
-      font-size: 22px;
-      font-weight: 700;
-      letter-spacing: -0.5px;
-      color: var(--text);
-    }
-
+    .logo { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
     .logo span { color: var(--accent-light); }
+    .tagline { font-size: 13px; color: var(--text-muted); margin-left: 4px; }
 
-    .tagline {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-left: 4px;
-    }
-
+    /* ── Main layout ─────────────────────────────────────────────────────────── */
     main {
       flex: 1;
       display: flex;
@@ -63,290 +53,175 @@
       gap: 32px;
     }
 
-    .hero {
-      text-align: center;
-      max-width: 520px;
-    }
-
-    .hero h1 {
-      font-size: 36px;
-      font-weight: 700;
-      letter-spacing: -1px;
-      line-height: 1.15;
-      margin-bottom: 14px;
-    }
-
+    /* ── Hero ────────────────────────────────────────────────────────────────── */
+    .hero { text-align: center; max-width: 520px; }
+    .hero h1 { font-size: 36px; font-weight: 700; letter-spacing: -1px; line-height: 1.15; margin-bottom: 14px; }
     .hero h1 span { color: var(--accent-light); }
-
-    .hero p {
-      font-size: 15px;
-      color: var(--text-muted);
-      line-height: 1.6;
-    }
+    .hero p { font-size: 15px; color: var(--text-muted); line-height: 1.6; }
 
     .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #1e1e2a;
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 4px 12px;
-      font-size: 12px;
-      color: var(--text-muted);
-      margin-bottom: 20px;
+      display: inline-flex; align-items: center; gap: 6px;
+      background: #1e1e2a; border: 1px solid var(--border);
+      border-radius: 20px; padding: 4px 12px;
+      font-size: 12px; color: var(--text-muted); margin-bottom: 20px;
     }
+    .badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 
-    .badge .dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--green);
-    }
-
-    /* Drop zone */
+    /* ── Drop zone ───────────────────────────────────────────────────────────── */
     .drop-zone {
-      width: 100%;
-      max-width: 560px;
+      position: relative;
+      width: 100%; max-width: 560px;
       border: 2px dashed var(--border);
       border-radius: var(--radius);
       padding: 48px 32px;
       text-align: center;
       cursor: pointer;
-      transition: border-color 0.2s, background 0.2s;
-      position: relative;
       background: var(--surface);
+      transition: border-color 0.2s, background 0.2s;
     }
-
-    .drop-zone:hover, .drop-zone.drag-over {
+    .drop-zone:hover,
+    .drop-zone.drag-over {
       border-color: var(--accent);
       background: #1e1b36;
     }
-
-    .drop-icon {
-      font-size: 40px;
-      margin-bottom: 12px;
+    .drop-zone:focus-visible {
+      outline: 2px solid var(--accent-light);
+      outline-offset: -2px;
+      border-color: var(--accent);
     }
 
-    /* Screen-reader only utility */
-    .sr-only {
-      position: absolute; width: 1px; height: 1px;
-      padding: 0; margin: -1px; overflow: hidden;
-      clip: rect(0,0,0,0); white-space: nowrap; border: 0;
-    }
-
-    .drop-zone .drop-title {
-      font-size: 17px;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-
-    .drop-zone p {
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-
-    .drop-zone .formats {
-      margin-top: 16px;
-      font-size: 11px;
-      color: var(--text-muted);
-      background: var(--surface2);
-      display: inline-block;
-      padding: 4px 10px;
-      border-radius: 6px;
-    }
-
-    /* Progress */
-    #progress-section {
+    /* The invisible file input covers the entire drop zone.
+       It handles native click-to-open-dialog AND native file drops.
+       No JS drag handling needed — only visual feedback via the parent div. */
+    .drop-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
       width: 100%;
-      max-width: 560px;
-      display: none;
-    }
-
-    .progress-bar-wrap {
-      background: var(--surface2);
-      border-radius: 6px;
-      height: 6px;
-      overflow: hidden;
-      margin-bottom: 8px;
-    }
-
-    .progress-bar {
       height: 100%;
-      background: linear-gradient(90deg, var(--accent), var(--accent-light));
-      border-radius: 6px;
-      width: 0%;
-      transition: width 0.3s;
     }
 
-    .progress-label {
-      font-size: 13px;
-      color: var(--text-muted);
+    .drop-icon { font-size: 40px; margin-bottom: 12px; pointer-events: none; }
+    .drop-title { font-size: 17px; font-weight: 600; margin-bottom: 6px; pointer-events: none; }
+    .drop-zone p { font-size: 13px; color: var(--text-muted); pointer-events: none; }
+    .drop-zone .formats {
+      margin-top: 16px; font-size: 11px; color: var(--text-muted);
+      background: var(--surface2); display: inline-block;
+      padding: 4px 10px; border-radius: 6px; pointer-events: none;
     }
 
-    /* Results */
-    #results-section {
-      width: 100%;
-      max-width: 760px;
+    /* ── Progress ────────────────────────────────────────────────────────────── */
+    #progress-section { width: 100%; max-width: 560px; display: none; }
+    .progress-bar-wrap { background: var(--surface2); border-radius: 6px; height: 6px; overflow: hidden; margin-bottom: 8px; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-light)); border-radius: 6px; width: 0%; transition: width 0.3s; }
+    .progress-label { font-size: 13px; color: var(--text-muted); }
+
+    /* ── Error ───────────────────────────────────────────────────────────────── */
+    #error-box {
       display: none;
+      background: #2a1a1a; border: 1px solid #5a2020;
+      color: var(--red); padding: 14px 18px;
+      border-radius: var(--radius); font-size: 14px;
+      max-width: 560px; width: 100%;
     }
+
+    /* ── Results ─────────────────────────────────────────────────────────────── */
+    #results-section { width: 100%; max-width: 760px; display: none; }
 
     .results-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 16px;
-      gap: 12px;
-      flex-wrap: wrap;
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px; gap: 12px; flex-wrap: wrap;
     }
+    .results-header h2 { font-size: 18px; font-weight: 600; }
+    .results-meta { font-size: 13px; color: var(--text-muted); }
 
-    .results-header h2 {
-      font-size: 18px;
-      font-weight: 600;
-    }
-
-    .results-meta {
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-
+    /* ── Buttons ─────────────────────────────────────────────────────────────── */
     .btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border-radius: 8px;
+      font-size: 14px; font-weight: 600; cursor: pointer; border: none;
       transition: opacity 0.15s, transform 0.1s;
+      min-height: 44px; min-width: 44px;
     }
-
     .btn:active { transform: scale(0.97); }
-
-    .btn-primary {
-      background: var(--accent);
-      color: #fff;
-    }
-
+    .btn:focus-visible { outline: 2px solid var(--accent-light); outline-offset: 2px; }
+    .btn-primary { background: var(--accent); color: #fff; }
     .btn-primary:hover { opacity: 0.88; }
-
-    .btn-ghost {
-      background: var(--surface2);
-      color: var(--text);
-      border: 1px solid var(--border);
-    }
-
+    .btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
     .btn-ghost:hover { background: var(--border); }
+    .btn-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
-    .btn-actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    /* Table */
-    .table-wrap {
-      overflow-x: auto;
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-
-    thead {
-      background: var(--surface2);
-    }
-
-    th {
-      padding: 12px 16px;
-      text-align: left;
-      font-weight: 600;
-      color: var(--text-muted);
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      white-space: nowrap;
-      cursor: pointer;
-      user-select: none;
-    }
-
-    th:hover { color: var(--text); }
-    th .sort-icon { margin-left: 4px; opacity: 0.4; font-style: normal; }
-    th.sort-asc .sort-icon::after  { content: '↑'; opacity: 1; }
-    th.sort-desc .sort-icon::after { content: '↓'; opacity: 1; }
-    th:not(.sort-asc):not(.sort-desc) .sort-icon::after { content: '↕'; }
-
-    td {
-      padding: 11px 16px;
-      border-top: 1px solid var(--border);
-      white-space: nowrap;
-    }
-
-    tr:hover td { background: var(--surface2); }
-
-    .amount-pos { color: var(--green); }
-    .amount-neg { color: var(--red); }
-
-    tfoot td {
-      padding: 11px 16px;
-      border-top: 2px solid var(--border);
-      font-weight: 700;
-      font-size: 13px;
-      background: var(--surface2);
-    }
-
-    /* Summary bar */
+    /* ── Summary bar ─────────────────────────────────────────────────────────── */
     .summary-bar {
-      display: flex;
-      gap: 16px;
-      flex-wrap: wrap;
-      align-items: center;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 12px 18px;
-      font-size: 13px;
-      width: 100%;
-      max-width: 760px;
+      display: flex; gap: 16px; flex-wrap: wrap; align-items: center;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 12px 18px;
+      font-size: 13px; width: 100%; max-width: 760px;
     }
-
     .summary-item { display: flex; flex-direction: column; gap: 2px; }
     .summary-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.4px; }
     .summary-value { font-weight: 600; font-size: 15px; }
     .summary-sep { width: 1px; height: 32px; background: var(--border); }
-
     .bank-badge {
       display: inline-flex; align-items: center; gap: 6px;
       background: #1e2a1e; border: 1px solid #2e5c2e;
       border-radius: 20px; padding: 4px 12px;
       font-size: 12px; color: #4ade80;
     }
-    .bank-badge.generic {
-      background: #1e1e2a; border-color: var(--border); color: var(--text-muted);
+    .bank-badge.generic { background: #1e1e2a; border-color: var(--border); color: var(--text-muted); }
+
+    /* ── Table ───────────────────────────────────────────────────────────────── */
+    .table-wrap {
+      overflow-x: auto; border-radius: var(--radius);
+      border: 1px solid var(--border); -webkit-overflow-scrolling: touch;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead { background: var(--surface2); }
+    th {
+      padding: 12px 16px; text-align: left; font-weight: 600;
+      color: var(--text-muted); font-size: 11px; text-transform: uppercase;
+      letter-spacing: 0.5px; white-space: nowrap; cursor: pointer; user-select: none;
+      min-height: 44px;
+    }
+    th:hover { color: var(--text); }
+    th:focus-visible { outline: 2px solid var(--accent-light); outline-offset: -2px; }
+    th .sort-icon { margin-left: 4px; opacity: 0.4; font-style: normal; }
+    th.sort-asc  .sort-icon::after { content: '↑'; opacity: 1; }
+    th.sort-desc .sort-icon::after { content: '↓'; opacity: 1; }
+    th:not(.sort-asc):not(.sort-desc) .sort-icon::after { content: '↕'; }
+
+    td { padding: 11px 16px; border-top: 1px solid var(--border); white-space: nowrap; }
+    tr:hover td { background: var(--surface2); }
+    td[contenteditable="true"]:focus { outline: 1px solid var(--accent); border-radius: 4px; }
+
+    .amount-pos { color: var(--green); }
+    .amount-neg { color: var(--red); }
+
+    tfoot td {
+      padding: 11px 16px; border-top: 2px solid var(--border);
+      font-weight: 700; font-size: 13px; background: var(--surface2);
     }
 
     /* Transaction type badges */
-    .type-badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
-      white-space: nowrap;
-    }
-    .type-cb       { background: #1e2040; color: #818cf8; }
-    .type-prlv     { background: #2a1e10; color: #fb923c; }
-    .type-vir      { background: #1a2e1a; color: #4ade80; }
-    .type-dab      { background: #2a1a1a; color: #f87171; }
-    .type-remb     { background: #1a2a2a; color: #22d3ee; }
-    .type-autre    { background: var(--surface2); color: var(--text-muted); }
+    .type-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+    .type-cb   { background: #1e2040; color: #818cf8; }
+    .type-prlv { background: #2a1e10; color: #fb923c; }
+    .type-vir  { background: #1a2e1a; color: #4ade80; }
+    .type-dab  { background: #2a1a1a; color: #f87171; }
+    .type-remb { background: #1a2a2a; color: #22d3ee; }
+    .type-autre{ background: var(--surface2); color: var(--text-muted); }
 
-    /* Add-file toast */
+    /* ── CSV separator option ────────────────────────────────────────────────── */
+    .options-row { width: 100%; max-width: 560px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+    .option-group { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
+    .option-group select {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); padding: 6px 10px; font-size: 13px; outline: none;
+    }
+    .option-group select:focus { border-color: var(--accent); }
+
+    /* ── Toast ───────────────────────────────────────────────────────────────── */
     #toast {
       position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
       background: var(--surface2); border: 1px solid var(--border);
@@ -354,169 +229,77 @@
       font-size: 13px; display: none; z-index: 100;
       animation: fadeup .25s ease;
     }
-    @keyframes fadeup { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+    @keyframes fadeup { from { opacity:0; transform:translateX(-50%) translateY(8px); } }
 
-    /* Editable cell */
-    td[contenteditable="true"]:focus {
-      outline: 1px solid var(--accent);
-      border-radius: 4px;
-    }
+    /* ── Footer ──────────────────────────────────────────────────────────────── */
+    footer { text-align: center; padding: 20px; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border); }
 
-    /* Error */
-    #error-box {
-      display: none;
-      background: #2a1a1a;
-      border: 1px solid #5a2020;
-      color: var(--red);
-      padding: 14px 18px;
-      border-radius: var(--radius);
-      font-size: 14px;
-      max-width: 560px;
-      width: 100%;
-    }
-
-    /* Footer */
-    footer {
-      text-align: center;
-      padding: 20px;
-      font-size: 12px;
-      color: var(--text-muted);
-      border-top: 1px solid var(--border);
-    }
-
-    /* Separator input */
-    .options-row {
-      width: 100%;
-      max-width: 560px;
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .option-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 13px;
-      color: var(--text-muted);
-    }
-
-    .option-group select, .option-group input {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      color: var(--text);
-      padding: 6px 10px;
-      font-size: 13px;
-      outline: none;
-    }
-
-    .option-group select:focus, .option-group input:focus {
-      border-color: var(--accent);
-    }
-
-    /* ── Focus visible (keyboard nav) ───────────────────────────────────────── */
-    :focus-visible {
-      outline: 2px solid var(--accent-light);
-      outline-offset: 3px;
-      border-radius: 4px;
-    }
-
-    .btn:focus-visible       { outline-offset: 2px; }
-    .drop-zone:focus-visible { outline-offset: -2px; border-color: var(--accent); }
-    th:focus-visible         { outline-offset: -2px; }
-
-    /* Minimum touch target 44px */
-    .btn { min-height: 44px; min-width: 44px; }
-    th   { min-height: 44px; }
-
-    /* ── Reduced motion ─────────────────────────────────────────────────────── */
+    /* ── Reduced motion ──────────────────────────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { transition: none !important; animation: none !important; }
-      .progress-bar { transition: none; }
     }
 
-    /* ── Responsive — tablet ────────────────────────────────────────────────── */
+    /* ── Responsive — tablet ─────────────────────────────────────────────────── */
     @media (max-width: 700px) {
       header { padding: 16px 20px; }
-
       main { padding: 32px 16px; gap: 24px; }
-
       .hero h1 { font-size: 26px; letter-spacing: -0.5px; }
-      .hero p  { font-size: 14px; }
-
+      .hero p { font-size: 14px; }
       .drop-zone { padding: 32px 20px; }
-
       .results-header { flex-direction: column; align-items: flex-start; }
-      .btn-actions    { width: 100%; }
+      .btn-actions { width: 100%; }
       .btn-actions .btn { flex: 1; justify-content: center; min-width: 0; }
-
       .summary-bar { gap: 12px; }
       .summary-sep { display: none; }
-
       #results-section { max-width: 100%; }
-
-      .table-wrap { border-radius: 8px; }
       td, th { padding: 10px 12px; font-size: 12px; }
-
       tfoot td { font-size: 12px; }
     }
 
-    /* ── Responsive — mobile ────────────────────────────────────────────────── */
+    /* ── Responsive — mobile ─────────────────────────────────────────────────── */
     @media (max-width: 420px) {
       .hero h1 { font-size: 22px; }
-
       .btn-actions { flex-direction: column; }
       .btn-actions .btn { width: 100%; }
-
       .options-row { flex-direction: column; align-items: flex-start; }
     }
-
-    /* Scroll hint on table */
-    .table-wrap { -webkit-overflow-scrolling: touch; }
   </style>
 </head>
 <body>
 
-<header role="banner">
-  <div class="logo" aria-label="Cozlo">Coz<span aria-hidden="true">lo</span></div>
-  <div class="tagline" aria-hidden="true">PDF bancaire → CSV</div>
+<header>
+  <div class="logo">Coz<span>lo</span></div>
+  <div class="tagline">PDF bancaire → CSV</div>
 </header>
 
-<main id="main-content">
+<main>
+  <!-- Hero -->
   <div class="hero">
-    <div class="badge" aria-label="Traitement 100% local, aucune donnée envoyée">
-      <span class="dot" aria-hidden="true"></span>
-      100% local — aucune donnée envoyée
-    </div>
+    <div class="badge"><span class="dot"></span> 100% local — aucune donnée envoyée</div>
     <h1>Convertissez vos <span>relevés bancaires</span> en CSV</h1>
     <p>Glissez votre PDF directement dans le navigateur. La conversion se fait localement, sans serveur.</p>
   </div>
 
-  <!-- Options -->
-  <div class="options-row" role="group" aria-label="Options d'export">
+  <!-- CSV separator -->
+  <div class="options-row">
     <div class="option-group">
       <label for="sep">Séparateur CSV</label>
-      <select id="sep" aria-describedby="sep-hint">
+      <select id="sep">
         <option value=";">; (point-virgule)</option>
         <option value=",">, (virgule)</option>
         <option value="&#9;">⇥ (tabulation)</option>
       </select>
-      <span id="sep-hint" class="sr-only">Choisissez le séparateur utilisé dans le fichier CSV exporté</span>
     </div>
   </div>
 
-  <input type="file" id="file-input" accept=".pdf" style="position:fixed;top:-200px;left:-200px;opacity:0;width:1px;height:1px;" tabindex="-1" aria-hidden="true" />
-
-  <!-- Drop zone -->
-  <div
-    class="drop-zone"
-    id="drop-zone"
-    role="button"
-    tabindex="0"
-    aria-label="Zone de dépôt de fichier PDF. Cliquez ou appuyez sur Entrée pour ouvrir le sélecteur."
-  >
+  <!-- Drop zone
+       The <input type="file"> covers the entire zone (position:absolute;inset:0;opacity:0).
+       It handles both clicks (opens file dialog) and file drops natively — no JS needed.
+       The parent div only adds/removes the drag-over class for visual feedback. -->
+  <div class="drop-zone" id="drop-zone" tabindex="0"
+       aria-label="Zone de dépôt PDF — cliquez ou faites glisser un fichier"
+       role="button">
+    <input type="file" id="file-input" accept=".pdf" tabindex="-1" />
     <div class="drop-icon" aria-hidden="true">📄</div>
     <p class="drop-title">Glissez votre relevé PDF ici</p>
     <p>ou cliquez pour sélectionner un fichier</p>
@@ -524,47 +307,34 @@
   </div>
 
   <!-- Progress -->
-  <div
-    id="progress-section"
-    role="status"
-    aria-live="polite"
-    aria-atomic="true"
-    aria-label="Progression de l'extraction"
-  >
+  <div id="progress-section" role="status" aria-live="polite">
     <div class="progress-bar-wrap">
-      <div
-        class="progress-bar"
-        id="progress-bar"
-        role="progressbar"
-        aria-valuenow="0"
-        aria-valuemin="0"
-        aria-valuemax="100"
-        aria-label="Progression"
-      ></div>
+      <div class="progress-bar" id="progress-bar" role="progressbar"
+           aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
     </div>
     <div class="progress-label" id="progress-label">Extraction en cours…</div>
   </div>
 
   <!-- Error -->
-  <div id="error-box" role="alert" aria-live="assertive"></div>
+  <div id="error-box" role="alert"></div>
 
   <!-- Results -->
-  <div id="results-section" aria-label="Résultats de la conversion">
+  <div id="results-section">
     <div class="results-header">
       <div>
-        <h2 id="results-title">Transactions détectées</h2>
-        <div class="results-meta" id="results-meta" aria-live="polite"></div>
+        <h2>Transactions détectées</h2>
+        <div class="results-meta" id="results-meta"></div>
       </div>
-      <div class="btn-actions" role="group" aria-label="Actions sur les résultats">
-        <button type="button" class="btn btn-ghost" id="btn-reset" aria-label="Recommencer avec un nouveau fichier">↩ Nouveau fichier</button>
-        <button type="button" class="btn btn-ghost" id="btn-add" aria-label="Ajouter un autre relevé PDF aux résultats">+ Ajouter un relevé</button>
-        <input type="file" id="file-add" accept=".pdf" aria-label="Sélectionner un relevé supplémentaire" style="display:none" />
-        <button type="button" class="btn btn-primary" id="btn-download" aria-label="Télécharger le fichier CSV">⬇ Télécharger CSV</button>
+      <div class="btn-actions">
+        <button type="button" class="btn btn-ghost" id="btn-reset">↩ Nouveau fichier</button>
+        <button type="button" class="btn btn-ghost" id="btn-add">+ Ajouter un relevé</button>
+        <input type="file" id="file-add" accept=".pdf" style="display:none" />
+        <button type="button" class="btn btn-primary" id="btn-download">⬇ Télécharger CSV</button>
       </div>
     </div>
-    <div id="summary-bar" class="summary-bar" aria-label="Résumé financier" style="display:none"></div>
-    <div class="table-wrap" style="margin-top:16px" role="region" aria-label="Tableau des transactions" tabindex="0">
-      <table id="results-table" aria-labelledby="results-title">
+    <div id="summary-bar" class="summary-bar" style="display:none"></div>
+    <div class="table-wrap" style="margin-top:16px">
+      <table>
         <thead id="table-head"></thead>
         <tbody id="table-body"></tbody>
         <tfoot id="table-foot"></tfoot>
@@ -573,9 +343,9 @@
   </div>
 </main>
 
-<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
-<footer role="contentinfo">
+<footer>
   <p>Cozlo — aucune donnée ne quitte votre navigateur &nbsp;·&nbsp; 2025</p>
 </footer>
 
@@ -583,8 +353,10 @@
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
+  // ── DOM refs ─────────────────────────────────────────────────────────────────
   const dropZone    = document.getElementById('drop-zone');
   const fileInput   = document.getElementById('file-input');
+  const fileAdd     = document.getElementById('file-add');
   const progressSec = document.getElementById('progress-section');
   const progressBar = document.getElementById('progress-bar');
   const progressLbl = document.getElementById('progress-label');
@@ -595,63 +367,70 @@
   const tableFoot   = document.getElementById('table-foot');
   const summaryBar  = document.getElementById('summary-bar');
   const resultsMeta = document.getElementById('results-meta');
+  const toast       = document.getElementById('toast');
 
-  const fileAdd    = document.getElementById('file-add');
-  const toast      = document.getElementById('toast');
-
+  // ── State ────────────────────────────────────────────────────────────────────
   let parsedRows = [], columns = [], sortState = { col: null, dir: 1 };
   let meta = { bank: null, openBalance: null, closeBalance: null, openDate: null, closeDate: null };
 
-  // Drag counter to handle dragleave on child elements
-  let dragCount = 0;
-
-  let justDropped = false;
-
-  dropZone.addEventListener('dragenter', e => { e.preventDefault(); dragCount++; dropZone.classList.add('drag-over'); });
-  dropZone.addEventListener('dragover',  e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
-  dropZone.addEventListener('dragleave', () => { dragCount--; if (dragCount === 0) dropZone.classList.remove('drag-over'); });
-  dropZone.addEventListener('drop', e => {
-    e.preventDefault();
-    dragCount = 0;
-    dropZone.classList.remove('drag-over');
-    justDropped = true;
-    setTimeout(() => { justDropped = false; }, 500);
-    const f = e.dataTransfer.files[0];
-    const isPdf = f && (f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
-    if (isPdf) processFile(f, false);
-    else showError('Veuillez déposer un fichier PDF.');
+  // ── Drop zone events ─────────────────────────────────────────────────────────
+  // The <input type="file"> inside handles drops and clicks natively.
+  // These handlers only manage the visual drag-over highlight.
+  dropZone.addEventListener('dragenter', e => {
+    e.preventDefault(); // needed so the browser shows a "copy" cursor
+    dropZone.classList.add('drag-over');
   });
+  dropZone.addEventListener('dragover', e => {
+    e.preventDefault(); // needed to allow the drop event to fire
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  dropZone.addEventListener('dragleave', e => {
+    // Only remove highlight when leaving the drop zone itself, not a child element
+    if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('drag-over');
+  });
+  dropZone.addEventListener('drop', () => dropZone.classList.remove('drag-over'));
 
-  // Click: don't open dialog if drop just happened (some browsers fire click after drop)
-  dropZone.addEventListener('click', () => { if (!justDropped) fileInput.click(); });
+  // Keyboard: Enter/Space opens the file dialog (the overlaid input handles clicks)
   dropZone.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
   });
-  fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0], false); });
-  fileAdd.addEventListener('change',  e => { if (e.target.files[0]) processFile(e.target.files[0], true);  fileAdd.value = ''; });
+
+  // ── File input events ────────────────────────────────────────────────────────
+  // "change" fires both when a file is dropped on the input AND when one is selected via dialog
+  fileInput.addEventListener('change', () => {
+    if (fileInput.files[0]) processFile(fileInput.files[0], false);
+    fileInput.value = ''; // reset so the same file can be re-dropped
+  });
+  fileAdd.addEventListener('change', () => {
+    if (fileAdd.files[0]) processFile(fileAdd.files[0], true);
+    fileAdd.value = '';
+  });
+
+  // ── Toolbar buttons ──────────────────────────────────────────────────────────
   document.getElementById('btn-reset').addEventListener('click', reset);
   document.getElementById('btn-add').addEventListener('click', () => fileAdd.click());
   document.getElementById('btn-download').addEventListener('click', downloadCSV);
 
-  // ── Extract items with (x, y) positions from all pages ──────────────────────
+  // ── PDF processing ───────────────────────────────────────────────────────────
   async function processFile(file, append = false) {
     if (!append) reset(false);
     setProgress(0, `Chargement de "${file.name}"…`);
     showProgress(true);
+
     try {
       const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
-      const n = pdf.numPages;
-      let allItems = [];
+      const totalPages = pdf.numPages;
+      const allItems = [];
 
-      for (let p = 1; p <= n; p++) {
-        setProgress(Math.round((p / n) * 80), `Page ${p} / ${n}…`);
-        const page = await pdf.getPage(p);
-        const vp = page.getViewport({ scale: 1 });
+      for (let p = 1; p <= totalPages; p++) {
+        setProgress(Math.round((p / totalPages) * 80), `Page ${p} / ${totalPages}…`);
+        const page    = await pdf.getPage(p);
+        const vp      = page.getViewport({ scale: 1 });
         const content = await page.getTextContent();
+
         for (const item of content.items) {
-          const t = item.str.replace(/[¨©®°¤]/g, '').trim();
-          if (!t) continue;
-          allItems.push({ x: item.transform[4], y: vp.height - item.transform[5], text: t, page: p });
+          const text = item.str.replace(/[¨©®°¤]/g, '').trim();
+          if (text) allItems.push({ x: item.transform[4], y: vp.height - item.transform[5], text, page: p });
         }
       }
 
@@ -664,16 +443,14 @@
       const result = detectAndParse(allItems);
 
       if (!result.rows.length) {
-        showError('Aucune transaction détectée. Ce format de relevé n\'est peut-être pas encore pris en charge.');
+        showError("Aucune transaction détectée. Ce format de relevé n'est peut-être pas encore pris en charge.");
         return;
       }
 
       if (append) {
-        // Merge: deduplicate by date+description+debit+credit key, then sort by date
         const existingKeys = new Set(parsedRows.map(rowKey));
         const newRows = result.rows.filter(r => !existingKeys.has(rowKey(r)));
-        parsedRows = [...parsedRows, ...newRows]
-          .sort((a, b) => parseDate(a['Date']) - parseDate(b['Date']));
+        parsedRows = [...parsedRows, ...newRows].sort((a, b) => parseDate(a['Date']) - parseDate(b['Date']));
         showToast(`+${newRows.length} transaction${newRows.length > 1 ? 's' : ''} ajoutée${newRows.length > 1 ? 's' : ''} depuis "${file.name}"`);
       } else {
         parsedRows = result.rows;
@@ -685,35 +462,27 @@
       renderSummary();
       renderTable();
       showResults();
+
     } catch (err) {
       showError('Erreur lors de la lecture du PDF : ' + err.message);
     }
   }
 
-  function rowKey(r) {
-    return [r['Date'], r['Description'], r['Débit'] || r['Montant'], r['Crédit']].join('|');
-  }
+  // ── Parsers ───────────────────────────────────────────────────────────────────
 
-  function parseDate(s) {
-    if (!s) return 0;
-    const [d, m, y] = s.split('/');
-    return new Date(+y, +m - 1, +d).getTime();
-  }
-
-  // ── Router ───────────────────────────────────────────────────────────────────
   function detectAndParse(items) {
     const allText = items.map(i => i.text).join(' ');
-    if (/cr.dit\s+agricole/i.test(allText)) return parseCreditAgricole(items);
-    return parseGeneric(items);
+    return /cr.dit\s+agricole/i.test(allText) ? parseCreditAgricole(items) : parseGeneric(items);
   }
 
-  // ── Group items by (page, Y) position — MUST include page to avoid cross-page merges ──
-  function groupByY(items, tol = 2) {
+  // Groups PDF text items by (page, Y) position to reconstruct rows.
+  // Page is included to avoid merging items from different pages at the same Y.
+  function groupByY(items, tolerance = 2) {
     const sorted = [...items].sort((a, b) => a.page - b.page || a.y - b.y || a.x - b.x);
     const groups = [];
     for (const item of sorted) {
       const last = groups[groups.length - 1];
-      if (last && last[0].page === item.page && Math.abs(last[0].y - item.y) <= tol) {
+      if (last && last[0].page === item.page && Math.abs(last[0].y - item.y) <= tolerance) {
         last.push(item);
       } else {
         groups.push([item]);
@@ -724,44 +493,41 @@
 
   const normStr = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
-  // ── Description cleaning ─────────────────────────────────────────────────────
   function categorize(raw) {
-    if (/^Ret\s+DAB/i.test(raw))       return 'Retrait';
-    if (/^Avoir\s+Carte/i.test(raw))   return 'Remboursement';
-    if (/^Carte\s+/i.test(raw))        return 'Achat CB';
-    if (/^Prlv\s+/i.test(raw))         return 'Prélèvement';
-    if (/^Virement\s+/i.test(raw))     return 'Virement';
+    if (/^Ret\s+DAB/i.test(raw))     return 'Retrait';
+    if (/^Avoir\s+Carte/i.test(raw)) return 'Remboursement';
+    if (/^Carte\s+/i.test(raw))      return 'Achat CB';
+    if (/^Prlv\s+/i.test(raw))       return 'Prélèvement';
+    if (/^Virement\s+/i.test(raw))   return 'Virement';
     return 'Autre';
   }
 
   function cleanDescription(raw) {
-    let s = raw;
-    s = s.replace(/^Ret\s+DAB\s+X\w+\s+/i, '');           // strip "Ret DAB X7621 "
-    s = s.replace(/^Avoir\s+Carte\s+X\w+\s+/i, '');        // strip "Avoir Carte X2063 "
-    s = s.replace(/^Carte\s+X\w+\s+/i, '');                // strip "Carte X7621 "
-    s = s.replace(/^Prlv\s+/i, '');                        // strip "Prlv "
-    s = s.replace(/^Virement\s+Vir\s+Inst\s+de\s+/i, ''); // strip "Virement Vir Inst de "
-    s = s.replace(/^Virement\s+/i, '');                    // strip "Virement "
-    s = s.replace(/\s+\d{2}\/\d{2}$/, '');                 // strip trailing card date "DD/MM"
-    s = s.replace(/\s{2,}/g, ' ').trim();
-    return s;
+    return raw
+      .replace(/^Ret\s+DAB\s+X\w+\s+/i, '')
+      .replace(/^Avoir\s+Carte\s+X\w+\s+/i, '')
+      .replace(/^Carte\s+X\w+\s+/i, '')
+      .replace(/^Prlv\s+/i, '')
+      .replace(/^Virement\s+Vir\s+Inst\s+de\s+/i, '')
+      .replace(/^Virement\s+/i, '')
+      .replace(/\s+\d{2}\/\d{2}$/, '')
+      .replace(/\s{2,}/g, ' ')
+      .trim();
   }
 
-  // ── Crédit Agricole parser ───────────────────────────────────────────────────
   function parseCreditAgricole(items) {
     const rows = groupByY(items, 4);
 
-    // Detect Débit / Crédit column X positions from the table header row
-    let debitX = null, creditX = null;
+    // Find the Débit/Crédit column X positions from the header row
+    let debitX = 415, creditX = 495;
     for (const row of rows) {
-      const dItem = row.find(it => normStr(it.text) === 'debit');
-      const cItem = row.find(it => normStr(it.text) === 'credit');
-      if (dItem && cItem) { debitX = dItem.x; creditX = cItem.x; break; }
+      const d = row.find(it => normStr(it.text) === 'debit');
+      const c = row.find(it => normStr(it.text) === 'credit');
+      if (d && c) { debitX = d.x; creditX = c.x; break; }
     }
-    if (debitX === null) { debitX = 415; creditX = 495; }
     const midX = (debitX + creditX) / 2;
 
-    // Extract year from any full 4-digit year in the document
+    // Extract the statement year from any 4-digit year in the document
     let year = new Date().getFullYear();
     for (const it of items) {
       const m = it.text.match(/\b(20\d{2})\b/);
@@ -769,8 +535,8 @@
     }
 
     // Extract opening/closing balances
-    let openBalance = null, closeBalance = null, openDate = null, closeDate = null;
     const allText = items.map(i => i.text).join(' ');
+    let openBalance = null, closeBalance = null, openDate = null, closeDate = null;
     const openM  = allText.match(/ancien\s+solde\s+cr[eé]diteur\s+au\s+(\d{2}\.\d{2}\.\d{4})\s+([\d\s]+,\d{2})/i);
     const closeM = allText.match(/nouveau\s+solde\s+cr[eé]diteur\s+au\s+(\d{2}\.\d{2}\.\d{4})\s+([\d\s]+,\d{2})/i);
     if (openM)  { openDate  = openM[1];  openBalance  = openM[2].trim(); }
@@ -780,21 +546,15 @@
     const AMOUNT = /^\d{1,3}(\s\d{3})*(,\d{2})?$|^\d+,\d{2}$/;
 
     function isNoise(texts) {
-      const t = texts.join(' ');
-      if (/^relev[eé]/i.test(texts[0])) return true;
-      if (/^(cr[eé]dit\s+agricole|sud\s+rh|date\s+d|libell[eé]|synth[eé]|monsieur\s|compte\s+ch[eè]|iban\s*:|bic\s*:|vos\s+r[eé]|le\s+mont|le\s+taux|taeg|indice|www\.|page\s+\d|total\s+des|ancien\s+solde|nouveau\s+solde|t[eé]l\s*[:\-]|fax\s*:|sos\s+perte|votre\s+(agence|conseiller)|il\s+est\s+possible|compte\s+n[°o])/i.test(t)) return true;
-      if (/^\d{4,}$/.test(texts[0]) && texts.length <= 2) return true;
-      return false;
+      const line = texts.join(' ');
+      return /^relev[eé]/i.test(texts[0])
+        || /^(cr[eé]dit\s+agricole|sud\s+rh|date\s+d|libell[eé]|synth[eé]|monsieur\s|compte\s+ch[eè]|iban\s*:|bic\s*:|vos\s+r[eé]|le\s+mont|le\s+taux|taeg|indice|www\.|page\s+\d|total\s+des|ancien\s+solde|nouveau\s+solde|t[eé]l\s*[:\-]|fax\s*:|sos\s+perte|votre\s+(agence|conseiller)|il\s+est\s+possible|compte\s+n[°o])/i.test(line)
+        || (/^\d{4,}$/.test(texts[0]) && texts.length <= 2);
     }
 
     function isRefCode(texts) {
       const t = texts.join('');
       return /^[A-Z0-9\/\-\.]{14,}$/.test(t) || /FR\d{2}ZZZ/i.test(t) || /^[0-9]{6,}\//.test(t);
-    }
-
-    function isContinuation(texts) {
-      // Human-readable continuation lines worth appending (e.g. exchange rate)
-      return /^mt\s+initial/i.test(texts.join(' '));
     }
 
     const transactions = [];
@@ -803,26 +563,25 @@
     for (const row of rows) {
       row.sort((a, b) => a.x - b.x);
       const texts = row.map(it => it.text).filter(Boolean);
-      if (!texts.length) continue;
-      if (isNoise(texts)) continue;
-      if (isRefCode(texts)) continue;
+      if (!texts.length || isNoise(texts) || isRefCode(texts)) continue;
 
-      // Scan first 4 items for a DD.MM date — margin codes like "260512" can precede it
-      const firstDateIdx = texts.findIndex((t, i) => i < 4 && DD_MM.test(t));
-      const m0 = firstDateIdx >= 0 ? texts[firstDateIdx].match(DD_MM) : null;
+      // Scan the first 4 text items for a DD.MM date.
+      // Margin codes (e.g. "260512") can appear before the date on the same row.
+      const dateIdx = texts.findIndex((t, i) => i < 4 && DD_MM.test(t));
+      const dateMatch = dateIdx >= 0 ? texts[dateIdx].match(DD_MM) : null;
 
-      if (m0) {
+      if (dateMatch) {
         if (current) transactions.push(current);
 
-        let descStart = firstDateIdx + 1;
-        if (texts[firstDateIdx + 1]?.match(DD_MM)) descStart = firstDateIdx + 2;
+        // Description starts after both dates (operation date + value date)
+        let descStart = dateIdx + 1;
+        if (texts[dateIdx + 1]?.match(DD_MM)) descStart = dateIdx + 2;
 
-        // Work on a copy of the row items starting from descStart
+        // Find the amount: scan from right, classify as debit or credit by X position
         const rowCopy = [...row];
         let debit = '', credit = '';
         for (let i = rowCopy.length - 1; i >= descStart; i--) {
-          const clean = rowCopy[i].text.replace(/\s/g, '');
-          if (AMOUNT.test(clean)) {
+          if (AMOUNT.test(rowCopy[i].text.replace(/\s/g, ''))) {
             if (rowCopy[i].x > midX) credit = rowCopy[i].text;
             else debit = rowCopy[i].text;
             rowCopy.splice(i, 1);
@@ -831,47 +590,44 @@
         }
 
         const rawDesc = rowCopy.slice(descStart).map(it => it.text).join(' ').trim();
-        const [, d, mo] = m0;
+        const [, d, mo] = dateMatch;
         current = {
-          'Date': `${d}/${mo}/${year}`,
-          'Type': categorize(rawDesc),
+          'Date':        `${d}/${mo}/${year}`,
+          'Type':        categorize(rawDesc),
           'Description': cleanDescription(rawDesc),
-          '_rawDesc': rawDesc, // kept for continuation appending, not exported
-          'Débit': debit,
-          'Crédit': credit
+          '_rawDesc':    rawDesc,
+          'Débit':       debit,
+          'Crédit':      credit,
         };
-      } else if (current && isContinuation(texts)) {
+      } else if (current && /^mt\s+initial/i.test(texts.join(' '))) {
+        // Append foreign currency detail lines (e.g. "Mt initial : 16,00 CHF — taux : 1,08750")
         current['Description'] += ' — ' + texts.join(' ');
       }
     }
 
     if (current) transactions.push(current);
 
-    // Strip internal field before export
-    const rows = transactions.map(({ _rawDesc, ...r }) => r);
     return {
-      rows,
+      rows:    transactions.map(({ _rawDesc, ...r }) => r),
       columns: ['Date', 'Type', 'Description', 'Débit', 'Crédit'],
-      meta: { bank: 'Crédit Agricole', openBalance, closeBalance, openDate, closeDate }
+      meta:    { bank: 'Crédit Agricole', openBalance, closeBalance, openDate, closeDate },
     };
   }
 
-  // ── Generic fallback parser ──────────────────────────────────────────────────
   function parseGeneric(items) {
-    const rows = groupByY(items, 3);
     const DATE_RE   = /\b(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})\b/;
     const AMOUNT_RE = /^\d{1,3}([.,]\d{3})*[.,]\d{2}$/;
-    const result = [];
+    const result    = [];
 
-    for (const row of rows) {
+    for (const row of groupByY(items, 3)) {
       row.sort((a, b) => a.x - b.x);
       const texts = row.map(it => it.text.trim()).filter(Boolean);
       const line  = texts.join(' ');
       const dm    = line.match(DATE_RE);
       if (!dm) continue;
 
-      let amount = '';
       const filtered = [...texts];
+      let amount = '';
       for (let i = filtered.length - 1; i >= 0; i--) {
         if (AMOUNT_RE.test(filtered[i].replace(/\s/g, ''))) {
           amount = filtered[i];
@@ -884,19 +640,18 @@
     }
 
     return {
-      rows: result,
+      rows:    result,
       columns: ['Date', 'Description', 'Montant'],
-      meta: { bank: null, openBalance: null, closeBalance: null, openDate: null, closeDate: null }
+      meta:    { bank: null, openBalance: null, closeBalance: null, openDate: null, closeDate: null },
     };
   }
 
-  // ── Summary bar ──────────────────────────────────────────────────────────────
-  function renderSummary() {
-    const { bank, openBalance, closeBalance, openDate, closeDate } = meta;
+  // ── Render ────────────────────────────────────────────────────────────────────
 
-    // Compute totals
-    const totalDebit  = parsedRows.reduce((s, r) => s + parseAmount(r['Débit']  || r['Montant'] || ''), 0);
-    const totalCredit = parsedRows.reduce((s, r) => s + parseAmount(r['Crédit'] || ''), 0);
+  function renderSummary() {
+    const totalDebit  = parsedRows.reduce((s, r) => s + parseAmount(r['Débit']   || r['Montant'] || ''), 0);
+    const totalCredit = parsedRows.reduce((s, r) => s + parseAmount(r['Crédit']  || ''), 0);
+    const { bank, openBalance, closeBalance, openDate, closeDate } = meta;
 
     const bankHtml = bank
       ? `<span class="bank-badge">✓ ${escHtml(bank)} détecté</span>`
@@ -920,14 +675,18 @@
     summaryBar.style.display = 'flex';
   }
 
-  // ── Table render + sorting ───────────────────────────────────────────────────
   function renderTable() {
-    // Header with sort icons
+    const TYPE_CSS = {
+      'Achat CB': 'type-cb', 'Prélèvement': 'type-prlv', 'Virement': 'type-vir',
+      'Retrait': 'type-dab', 'Remboursement': 'type-remb', 'Autre': 'type-autre',
+    };
+
+    // Header row with sort icons
     tableHead.innerHTML = '<tr>' + columns.map(col => {
-      const isSorted = sortState.col === col;
-      const cls = isSorted ? (sortState.dir === 1 ? 'sort-asc' : 'sort-desc') : '';
-      const ariaSort = isSorted ? (sortState.dir === 1 ? 'ascending' : 'descending') : 'none';
-      return `<th class="${cls}" data-col="${escHtml(col)}" role="columnheader" scope="col" aria-sort="${ariaSort}" tabindex="0">${escHtml(col)}<i class="sort-icon" aria-hidden="true"></i></th>`;
+      const sorted = sortState.col === col;
+      const cls = sorted ? (sortState.dir === 1 ? 'sort-asc' : 'sort-desc') : '';
+      const ariaSort = sorted ? (sortState.dir === 1 ? 'ascending' : 'descending') : 'none';
+      return `<th class="${cls}" data-col="${escHtml(col)}" scope="col" aria-sort="${ariaSort}" tabindex="0">${escHtml(col)}<i class="sort-icon" aria-hidden="true"></i></th>`;
     }).join('') + '</tr>';
 
     tableHead.querySelectorAll('th').forEach(th => {
@@ -935,27 +694,17 @@
       th.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sortBy(th.dataset.col); } });
     });
 
-    const TYPE_CSS = {
-      'Achat CB': 'type-cb', 'Prélèvement': 'type-prlv', 'Virement': 'type-vir',
-      'Retrait': 'type-dab', 'Remboursement': 'type-remb', 'Autre': 'type-autre'
-    };
-
-    // Body
+    // Data rows
     tableBody.innerHTML = parsedRows.map((row, ri) =>
       '<tr>' + columns.map(col => {
         const val  = row[col] ?? '';
         const colN = normStr(col);
-        let cls = '', inner = escHtml(val);
-        if (colN === 'debit')   cls = val ? 'amount-neg' : '';
-        else if (colN === 'credit') cls = val ? 'amount-pos' : '';
-        else if (colN === 'montant') {
-          const n = parseFloat(val.replace(/[^\d,.\-+]/g, '').replace(',', '.'));
-          if (!isNaN(n)) cls = n >= 0 ? 'amount-pos' : 'amount-neg';
-        } else if (colN === 'type') {
-          inner = `<span class="type-badge ${TYPE_CSS[val] || 'type-autre'}">${escHtml(val)}</span>`;
-          return `<td data-row="${ri}" data-col="${col}">${inner}</td>`;
+        if (colN === 'type') {
+          return `<td><span class="type-badge ${TYPE_CSS[val] || 'type-autre'}">${escHtml(val)}</span></td>`;
         }
-        return `<td contenteditable="true" class="${cls}" data-row="${ri}" data-col="${col}">${inner}</td>`;
+        const cls = colN === 'debit' && val ? 'amount-neg'
+                  : colN === 'credit' && val ? 'amount-pos' : '';
+        return `<td contenteditable="true" class="${cls}" data-row="${ri}" data-col="${col}">${escHtml(val)}</td>`;
       }).join('') + '</tr>'
     ).join('');
 
@@ -963,16 +712,14 @@
       td.addEventListener('input', () => { parsedRows[+td.dataset.row][td.dataset.col] = td.textContent; });
     });
 
-    // Footer totals row
+    // Footer totals
     const totalDebit  = parsedRows.reduce((s, r) => s + parseAmount(r['Débit']  || ''), 0);
     const totalCredit = parsedRows.reduce((s, r) => s + parseAmount(r['Crédit'] || ''), 0);
-    const hasDC = columns.includes('Débit') && columns.includes('Crédit');
-
-    if (hasDC) {
+    if (columns.includes('Débit') && columns.includes('Crédit')) {
       tableFoot.innerHTML = '<tr>' + columns.map(col => {
-        if (col === 'Date') return `<td style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px">Total</td>`;
-        if (col === 'Débit')   return `<td class="amount-neg">${totalDebit  ? fmtAmt(totalDebit)  + ' €' : ''}</td>`;
-        if (col === 'Crédit')  return `<td class="amount-pos">${totalCredit ? fmtAmt(totalCredit) + ' €' : ''}</td>`;
+        if (col === 'Date')   return `<td style="color:var(--text-muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px">Total</td>`;
+        if (col === 'Débit')  return `<td class="amount-neg">${totalDebit  ? fmtAmt(totalDebit)  + ' €' : ''}</td>`;
+        if (col === 'Crédit') return `<td class="amount-pos">${totalCredit ? fmtAmt(totalCredit) + ' €' : ''}</td>`;
         return '<td></td>';
       }).join('') + '</tr>';
     } else {
@@ -984,66 +731,89 @@
   }
 
   function sortBy(col) {
-    if (sortState.col === col) sortState.dir *= -1;
-    else { sortState.col = col; sortState.dir = 1; }
-
+    sortState.dir = sortState.col === col ? sortState.dir * -1 : 1;
+    sortState.col = col;
     parsedRows.sort((a, b) => {
       const va = a[col] ?? '', vb = b[col] ?? '';
       const na = parseAmount(va), nb = parseAmount(vb);
       if (!isNaN(na) && !isNaN(nb) && (na || nb)) return (na - nb) * sortState.dir;
       return va.localeCompare(vb, 'fr') * sortState.dir;
     });
-
     renderTable();
   }
 
-  // ── CSV Download ─────────────────────────────────────────────────────────────
+  // ── CSV export ────────────────────────────────────────────────────────────────
+
   function downloadCSV() {
     const sep = document.getElementById('sep').value;
-    const csv = [columns.join(sep),
+    const csv = [
+      columns.join(sep),
       ...parsedRows.map(row => columns.map(col => `"${(row[col] ?? '').replace(/"/g, '""')}"`).join(sep))
     ].join('\n');
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
     const a = Object.assign(document.createElement('a'), {
-      href: URL.createObjectURL(blob),
-      download: 'releve_' + new Date().toISOString().slice(0, 10) + '.csv'
+      href:     URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })),
+      download: 'releve_' + new Date().toISOString().slice(0, 10) + '.csv',
     });
     a.click();
     URL.revokeObjectURL(a.href);
   }
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
+  // ── UI helpers ────────────────────────────────────────────────────────────────
+
+  function showProgress(on) { progressSec.style.display = on ? 'block' : 'none'; }
+  function setProgress(pct, label) {
+    progressBar.style.width = pct + '%';
+    progressBar.setAttribute('aria-valuenow', pct);
+    progressLbl.textContent = label;
+  }
+  function showResults() {
+    showProgress(false);
+    resultsSec.style.display = 'block';
+    dropZone.style.display   = 'none';
+  }
+  function showError(msg) {
+    showProgress(false);
+    errorBox.style.display   = 'block';
+    errorBox.textContent     = '⚠ ' + msg;
+  }
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
   function parseAmount(s) {
     if (!s) return NaN;
     return parseFloat(s.replace(/\s/g, '').replace(',', '.')) || NaN;
   }
-
   function fmtAmt(n) {
     return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function rowKey(r) {
+    return [r['Date'], r['Description'], r['Débit'] || r['Montant'], r['Crédit']].join('|');
+  }
+  function parseDate(s) {
+    if (!s) return 0;
+    const [d, m, y] = s.split('/');
+    return new Date(+y, +m - 1, +d).getTime();
   }
 
   let toastTimer;
   function showToast(msg) {
-    toast.textContent = msg; toast.style.display = 'block';
+    toast.textContent = msg;
+    toast.style.display = 'block';
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 3500);
   }
-
-  function showProgress(v)      { progressSec.style.display = v ? 'block' : 'none'; }
-  function setProgress(p, lbl)  { progressBar.style.width = p + '%'; progressBar.setAttribute('aria-valuenow', p); progressLbl.textContent = lbl; }
-  function showResults()        { showProgress(false); resultsSec.style.display = 'block'; dropZone.style.display = 'none'; }
-  function showError(msg)       { showProgress(false); errorBox.style.display = 'block'; errorBox.textContent = '⚠ ' + msg; }
-  function escHtml(s)           { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
   function reset(showDrop = true) {
     parsedRows = []; columns = []; sortState = { col: null, dir: 1 };
     meta = { bank: null, openBalance: null, closeBalance: null, openDate: null, closeDate: null };
     tableHead.innerHTML = ''; tableBody.innerHTML = ''; tableFoot.innerHTML = '';
     summaryBar.style.display = 'none'; summaryBar.innerHTML = '';
-    resultsMeta.textContent = '';
-    resultsSec.style.display = 'none'; errorBox.style.display = 'none';
-    showProgress(false); progressBar.style.width = '0%';
-    if (showDrop) { dropZone.style.display = 'block'; fileInput.value = ''; }
+    resultsMeta.textContent  = '';
+    resultsSec.style.display = 'none';
+    errorBox.style.display   = 'none';
+    showProgress(false);
+    progressBar.style.width = '0%';
+    if (showDrop) dropZone.style.display = 'block';
   }
 </script>
 </body>
