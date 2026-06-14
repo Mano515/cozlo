@@ -332,6 +332,32 @@
       background: #1e1e2a; border-color: var(--border); color: var(--text-muted);
     }
 
+    /* Transaction type badges */
+    .type-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .type-cb       { background: #1e2040; color: #818cf8; }
+    .type-prlv     { background: #2a1e10; color: #fb923c; }
+    .type-vir      { background: #1a2e1a; color: #4ade80; }
+    .type-dab      { background: #2a1a1a; color: #f87171; }
+    .type-remb     { background: #1a2a2a; color: #22d3ee; }
+    .type-autre    { background: var(--surface2); color: var(--text-muted); }
+
+    /* Add-file toast */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 10px 20px; border-radius: 8px;
+      font-size: 13px; display: none; z-index: 100;
+      animation: fadeup .25s ease;
+    }
+    @keyframes fadeup { from { opacity:0; transform:translateX(-50%) translateY(8px); } to { opacity:1; transform:translateX(-50%) translateY(0); } }
+
     /* Editable cell */
     td[contenteditable="true"]:focus {
       outline: 1px solid var(--accent);
@@ -448,6 +474,8 @@
       </div>
       <div class="btn-actions">
         <button class="btn btn-ghost" id="btn-reset">↩ Nouveau fichier</button>
+        <button class="btn btn-ghost" id="btn-add">+ Ajouter un relevé</button>
+        <input type="file" id="file-add" accept=".pdf" style="display:none" />
         <button class="btn btn-primary" id="btn-download">⬇ Télécharger CSV</button>
       </div>
     </div>
@@ -461,6 +489,8 @@
     </div>
   </div>
 </main>
+
+<div id="toast"></div>
 
 <footer>
   Cozlo — aucune donnée ne quitte votre navigateur &nbsp;·&nbsp; 2025
@@ -483,6 +513,9 @@
   const summaryBar  = document.getElementById('summary-bar');
   const resultsMeta = document.getElementById('results-meta');
 
+  const fileAdd    = document.getElementById('file-add');
+  const toast      = document.getElementById('toast');
+
   let parsedRows = [], columns = [], sortState = { col: null, dir: 1 };
   let meta = { bank: null, openBalance: null, closeBalance: null, openDate: null, closeDate: null };
 
@@ -492,16 +525,18 @@
     e.preventDefault();
     dropZone.classList.remove('drag-over');
     const f = e.dataTransfer.files[0];
-    if (f && f.type === 'application/pdf') processFile(f);
+    if (f && f.type === 'application/pdf') processFile(f, false);
     else showError('Veuillez déposer un fichier PDF.');
   });
-  fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0]); });
+  fileInput.addEventListener('change', e => { if (e.target.files[0]) processFile(e.target.files[0], false); });
+  fileAdd.addEventListener('change',  e => { if (e.target.files[0]) processFile(e.target.files[0], true);  fileAdd.value = ''; });
   document.getElementById('btn-reset').addEventListener('click', reset);
+  document.getElementById('btn-add').addEventListener('click', () => fileAdd.click());
   document.getElementById('btn-download').addEventListener('click', downloadCSV);
 
   // ── Extract items with (x, y) positions from all pages ──────────────────────
-  async function processFile(file) {
-    reset(false);
+  async function processFile(file, append = false) {
+    if (!append) reset(false);
     setProgress(0, `Chargement de "${file.name}"…`);
     showProgress(true);
     try {
@@ -515,27 +550,36 @@
         const vp = page.getViewport({ scale: 1 });
         const content = await page.getTextContent();
         for (const item of content.items) {
-          const t = item.str.replace(/[¨©®°¤]/g, '').trim(); // strip PDF encoding artifacts
+          const t = item.str.replace(/[¨©®°¤]/g, '').trim();
           if (!t) continue;
           allItems.push({ x: item.transform[4], y: vp.height - item.transform[5], text: t, page: p });
         }
       }
 
-      // Detect scanned PDF (image-only, no extractable text)
       if (allItems.length < 20) {
-        showError('Ce PDF semble être un scan (image). Cozlo nécessite un PDF avec du texte sélectionnable. Essayez d\'exporter votre relevé directement depuis l\'espace client de votre banque.');
+        showError('Ce PDF semble être un scan (image). Cozlo nécessite un PDF avec du texte sélectionnable.');
         return;
       }
 
       setProgress(90, 'Analyse des transactions…');
       const result = detectAndParse(allItems);
-      parsedRows = result.rows;
-      columns    = result.columns;
-      meta       = result.meta;
 
-      if (!parsedRows.length) {
+      if (!result.rows.length) {
         showError('Aucune transaction détectée. Ce format de relevé n\'est peut-être pas encore pris en charge.');
         return;
+      }
+
+      if (append) {
+        // Merge: deduplicate by date+description+debit+credit key, then sort by date
+        const existingKeys = new Set(parsedRows.map(rowKey));
+        const newRows = result.rows.filter(r => !existingKeys.has(rowKey(r)));
+        parsedRows = [...parsedRows, ...newRows]
+          .sort((a, b) => parseDate(a['Date']) - parseDate(b['Date']));
+        showToast(`+${newRows.length} transaction${newRows.length > 1 ? 's' : ''} ajoutée${newRows.length > 1 ? 's' : ''} depuis "${file.name}"`);
+      } else {
+        parsedRows = result.rows;
+        columns    = result.columns;
+        meta       = result.meta;
       }
 
       setProgress(100, 'Terminé !');
@@ -545,6 +589,16 @@
     } catch (err) {
       showError('Erreur lors de la lecture du PDF : ' + err.message);
     }
+  }
+
+  function rowKey(r) {
+    return [r['Date'], r['Description'], r['Débit'] || r['Montant'], r['Crédit']].join('|');
+  }
+
+  function parseDate(s) {
+    if (!s) return 0;
+    const [d, m, y] = s.split('/');
+    return new Date(+y, +m - 1, +d).getTime();
   }
 
   // ── Router ───────────────────────────────────────────────────────────────────
@@ -570,6 +624,29 @@
   }
 
   const normStr = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+  // ── Description cleaning ─────────────────────────────────────────────────────
+  function categorize(raw) {
+    if (/^Ret\s+DAB/i.test(raw))       return 'Retrait';
+    if (/^Avoir\s+Carte/i.test(raw))   return 'Remboursement';
+    if (/^Carte\s+/i.test(raw))        return 'Achat CB';
+    if (/^Prlv\s+/i.test(raw))         return 'Prélèvement';
+    if (/^Virement\s+/i.test(raw))     return 'Virement';
+    return 'Autre';
+  }
+
+  function cleanDescription(raw) {
+    let s = raw;
+    s = s.replace(/^Ret\s+DAB\s+X\w+\s+/i, '');           // strip "Ret DAB X7621 "
+    s = s.replace(/^Avoir\s+Carte\s+X\w+\s+/i, '');        // strip "Avoir Carte X2063 "
+    s = s.replace(/^Carte\s+X\w+\s+/i, '');                // strip "Carte X7621 "
+    s = s.replace(/^Prlv\s+/i, '');                        // strip "Prlv "
+    s = s.replace(/^Virement\s+Vir\s+Inst\s+de\s+/i, ''); // strip "Virement Vir Inst de "
+    s = s.replace(/^Virement\s+/i, '');                    // strip "Virement "
+    s = s.replace(/\s+\d{2}\/\d{2}$/, '');                 // strip trailing card date "DD/MM"
+    s = s.replace(/\s{2,}/g, ' ').trim();
+    return s;
+  }
 
   // ── Crédit Agricole parser ───────────────────────────────────────────────────
   function parseCreditAgricole(items) {
@@ -654,19 +731,28 @@
           }
         }
 
-        const desc = rowCopy.slice(descStart).map(it => it.text).join(' ').trim();
+        const rawDesc = rowCopy.slice(descStart).map(it => it.text).join(' ').trim();
         const [, d, mo] = m0;
-        current = { 'Date': `${d}/${mo}/${year}`, 'Description': desc, 'Débit': debit, 'Crédit': credit };
+        current = {
+          'Date': `${d}/${mo}/${year}`,
+          'Type': categorize(rawDesc),
+          'Description': cleanDescription(rawDesc),
+          '_rawDesc': rawDesc, // kept for continuation appending, not exported
+          'Débit': debit,
+          'Crédit': credit
+        };
       } else if (current && isContinuation(texts)) {
-        // Append exchange rate info to description
         current['Description'] += ' — ' + texts.join(' ');
       }
     }
 
     if (current) transactions.push(current);
+
+    // Strip internal field before export
+    const rows = transactions.map(({ _rawDesc, ...r }) => r);
     return {
-      rows: transactions,
-      columns: ['Date', 'Description', 'Débit', 'Crédit'],
+      rows,
+      columns: ['Date', 'Type', 'Description', 'Débit', 'Crédit'],
       meta: { bank: 'Crédit Agricole', openBalance, closeBalance, openDate, closeDate }
     };
   }
@@ -748,19 +834,27 @@
       th.addEventListener('click', () => sortBy(th.dataset.col));
     });
 
+    const TYPE_CSS = {
+      'Achat CB': 'type-cb', 'Prélèvement': 'type-prlv', 'Virement': 'type-vir',
+      'Retrait': 'type-dab', 'Remboursement': 'type-remb', 'Autre': 'type-autre'
+    };
+
     // Body
     tableBody.innerHTML = parsedRows.map((row, ri) =>
       '<tr>' + columns.map(col => {
         const val  = row[col] ?? '';
         const colN = normStr(col);
-        let cls = '';
+        let cls = '', inner = escHtml(val);
         if (colN === 'debit')   cls = val ? 'amount-neg' : '';
         else if (colN === 'credit') cls = val ? 'amount-pos' : '';
         else if (colN === 'montant') {
           const n = parseFloat(val.replace(/[^\d,.\-+]/g, '').replace(',', '.'));
           if (!isNaN(n)) cls = n >= 0 ? 'amount-pos' : 'amount-neg';
+        } else if (colN === 'type') {
+          inner = `<span class="type-badge ${TYPE_CSS[val] || 'type-autre'}">${escHtml(val)}</span>`;
+          return `<td data-row="${ri}" data-col="${col}">${inner}</td>`;
         }
-        return `<td contenteditable="true" class="${cls}" data-row="${ri}" data-col="${col}">${escHtml(val)}</td>`;
+        return `<td contenteditable="true" class="${cls}" data-row="${ri}" data-col="${col}">${inner}</td>`;
       }).join('') + '</tr>'
     ).join('');
 
@@ -825,6 +919,13 @@
 
   function fmtAmt(n) {
     return n.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  let toastTimer;
+  function showToast(msg) {
+    toast.textContent = msg; toast.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 3500);
   }
 
   function showProgress(v)      { progressSec.style.display = v ? 'block' : 'none'; }
