@@ -90,25 +90,13 @@
       border-color: var(--accent);
     }
 
-    /* The invisible file input covers the entire drop zone.
-       It handles native click-to-open-dialog AND native file drops.
-       No JS drag handling needed — only visual feedback via the parent div. */
-    .drop-zone input[type="file"] {
-      position: absolute;
-      inset: 0;
-      opacity: 0;
-      cursor: pointer;
-      width: 100%;
-      height: 100%;
-    }
-
-    .drop-icon { font-size: 40px; margin-bottom: 12px; pointer-events: none; }
-    .drop-title { font-size: 17px; font-weight: 600; margin-bottom: 6px; pointer-events: none; }
-    .drop-zone p { font-size: 13px; color: var(--text-muted); pointer-events: none; }
+    .drop-icon { font-size: 40px; margin-bottom: 12px; }
+    .drop-title { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+    .drop-zone p { font-size: 13px; color: var(--text-muted); }
     .drop-zone .formats {
       margin-top: 16px; font-size: 11px; color: var(--text-muted);
       background: var(--surface2); display: inline-block;
-      padding: 4px 10px; border-radius: 6px; pointer-events: none;
+      padding: 4px 10px; border-radius: 6px;
     }
 
     /* ── Progress ────────────────────────────────────────────────────────────── */
@@ -234,6 +222,18 @@
     /* ── Footer ──────────────────────────────────────────────────────────────── */
     footer { text-align: center; padding: 20px; font-size: 12px; color: var(--text-muted); border-top: 1px solid var(--border); }
 
+    /* ── Responsive — large screens (≥1100px) ───────────────────────────────── */
+    @media (min-width: 1100px) {
+      main { padding: 80px 48px; gap: 40px; }
+      .hero { max-width: 680px; }
+      .hero h1 { font-size: 46px; }
+      .hero p { font-size: 16px; }
+      .drop-zone { max-width: 680px; padding: 64px 48px; }
+      .options-row { max-width: 680px; }
+      #results-section { max-width: 1000px; }
+      .summary-bar { max-width: 1000px; }
+    }
+
     /* ── Reduced motion ──────────────────────────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { transition: none !important; animation: none !important; }
@@ -292,14 +292,14 @@
     </div>
   </div>
 
-  <!-- Drop zone
-       The <input type="file"> covers the entire zone (position:absolute;inset:0;opacity:0).
-       It handles both clicks (opens file dialog) and file drops natively — no JS needed.
-       The parent div only adds/removes the drag-over class for visual feedback. -->
+  <!-- The file input is hidden off-screen. Click on the drop zone triggers it
+       programmatically. Drag-and-drop is handled by the div's drop event via dataTransfer. -->
+  <input type="file" id="file-input" accept=".pdf"
+         style="position:absolute;width:0;height:0;opacity:0;overflow:hidden" tabindex="-1" />
+
   <div class="drop-zone" id="drop-zone" tabindex="0"
        aria-label="Zone de dépôt PDF — cliquez ou faites glisser un fichier"
        role="button">
-    <input type="file" id="file-input" accept=".pdf" tabindex="-1" />
     <div class="drop-icon" aria-hidden="true">📄</div>
     <p class="drop-title">Glissez votre relevé PDF ici</p>
     <p>ou cliquez pour sélectionner un fichier</p>
@@ -374,32 +374,40 @@
   let meta = { bank: null, openBalance: null, closeBalance: null, openDate: null, closeDate: null };
 
   // ── Drop zone events ─────────────────────────────────────────────────────────
-  // The <input type="file"> inside handles drops and clicks natively.
-  // These handlers only manage the visual drag-over highlight.
   dropZone.addEventListener('dragenter', e => {
-    e.preventDefault(); // needed so the browser shows a "copy" cursor
+    e.preventDefault();
     dropZone.classList.add('drag-over');
   });
   dropZone.addEventListener('dragover', e => {
-    e.preventDefault(); // needed to allow the drop event to fire
+    e.preventDefault(); // required to allow the drop event to fire
     e.dataTransfer.dropEffect = 'copy';
   });
   dropZone.addEventListener('dragleave', e => {
-    // Only remove highlight when leaving the drop zone itself, not a child element
+    // relatedTarget is where the cursor went — if still inside the zone, ignore
     if (!dropZone.contains(e.relatedTarget)) dropZone.classList.remove('drag-over');
   });
-  dropZone.addEventListener('drop', () => dropZone.classList.remove('drag-over'));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      processFile(file, false);
+    } else {
+      showError('Veuillez déposer un fichier PDF.');
+    }
+  });
 
-  // Keyboard: Enter/Space opens the file dialog (the overlaid input handles clicks)
+  // Click opens the file dialog; keyboard (Enter/Space) does the same
+  dropZone.addEventListener('click', () => fileInput.click());
   dropZone.addEventListener('keydown', e => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInput.click(); }
   });
 
-  // ── File input events ────────────────────────────────────────────────────────
-  // "change" fires both when a file is dropped on the input AND when one is selected via dialog
+  // ── File input (dialog selection only — drops are handled above via dataTransfer) ──
   fileInput.addEventListener('change', () => {
     if (fileInput.files[0]) processFile(fileInput.files[0], false);
-    fileInput.value = ''; // reset so the same file can be re-dropped
+    fileInput.value = '';
   });
   fileAdd.addEventListener('change', () => {
     if (fileAdd.files[0]) processFile(fileAdd.files[0], true);
