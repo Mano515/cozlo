@@ -1,10 +1,19 @@
-# Cozlo
+<img src="screenshots/logo.svg" alt="Cozlo" width="140" />
 
 Convertisseur de relevés bancaires PDF en CSV, entièrement dans le navigateur.
 
 Aucune donnée ne quitte votre appareil — le traitement est 100% local, sans serveur, sans compte.
 
 **[→ Ouvrir l'outil](https://mano515.github.io/cozlo/)**
+
+---
+
+<table>
+  <tr>
+    <td><img src="screenshots/screenshot-desktop.png" alt="Cozlo desktop" width="600" /></td>
+    <td><img src="screenshots/screenshot-mobile.png" alt="Cozlo mobile" width="220" /></td>
+  </tr>
+</table>
 
 ---
 
